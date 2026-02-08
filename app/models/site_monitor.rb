@@ -1,0 +1,2 @@
+class SiteMonitor < ApplicationRecord
+end

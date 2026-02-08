@@ -3,10 +3,7 @@ import { createRoot } from "react-dom/client"
 
 function HelloReact() {
   return createElement(
-    "div",
-    { className: "hello-react" },
-    createElement("h1", null, "Hello from React"),
-    createElement("p", null, "This is the Llms Text app homepage.")
+    "div"
   )
 }
 

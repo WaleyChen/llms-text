@@ -1,1 +1,23 @@
-<div id="root"></div>
+<div class="page-background">
+  <div class="page-hero">
+    <h1 class="page-title">Generate llms.txt</h1>
+    <div data-controller="url-input" class="prompt-box">
+    <form class="prompt-box-inner prompt-box--url" action="#" method="post" accept-charset="utf-8">
+      <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+      <input
+        id="url"
+        type="url"
+        name="url"
+        placeholder="https://example.com"
+        autocomplete="url"
+        class="prompt-input"
+        data-url-input-target="input"
+      >
+      <div class="prompt-box-footer">
+        <button type="submit" class="prompt-submit-btn">Generate</button>
+      </div>
+    </form>
+    </div>
+  </div>
+  <div id="root"></div>
+</div>

@@ -30,7 +30,7 @@ function HomePage() {
           createElement("input", {
             id: "url",
             type: "url",
-            name: "url",
+            name: "site[url]",
             placeholder: "https://example.com",
             autoComplete: "url",
             className: "prompt-input",

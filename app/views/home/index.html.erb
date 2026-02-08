@@ -2,8 +2,7 @@
   <div class="page-hero">
     <h1 class="page-title">Generate llms.txt</h1>
     <div data-controller="url-input" class="prompt-box">
-    <form class="prompt-box-inner prompt-box--url" action="#" method="post" accept-charset="utf-8">
-      <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+    <%= form_tag llm_txts_path, method: :post, class: "prompt-box-inner prompt-box--url" do %>
       <input
         id="url"
         type="url"
@@ -14,9 +13,9 @@
         data-url-input-target="input"
       >
       <div class="prompt-box-footer">
-        <button type="submit" class="prompt-submit-btn">Generate</button>
+        <%= submit_tag "Generate", class: "prompt-submit-btn" %>
       </div>
-    </form>
+    <% end %>
     </div>
   </div>
   <div id="root"></div>

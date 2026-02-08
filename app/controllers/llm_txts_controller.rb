@@ -1,0 +1,2 @@
+class LlmTxtsController < ApplicationController
+end

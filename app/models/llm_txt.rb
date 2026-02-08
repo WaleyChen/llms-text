@@ -1,0 +1,2 @@
+class LlmTxt < ApplicationRecord
+end

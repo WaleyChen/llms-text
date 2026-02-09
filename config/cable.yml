@@ -1,5 +1,5 @@
-# Use solid_cable in development so broadcasts from a separate job process (bin/jobs)
-# reach the browser. With adapter: async, only the same process receives broadcasts.
+# Use solid_cable so broadcasts from the job process (Solid Queue) reach the browser
+# via the cable DB. Ensure cable DB exists: bin/rails db:prepare
 development:
   adapter: solid_cable
   connects_to:

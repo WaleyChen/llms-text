@@ -38,6 +38,14 @@ function HomePage() {
       .finally(() => setLoadingRunsForId(null))
   }, [expandedSiteId])
 
+  // Connect to Action Cable once on mount so the WebSocket is open before any subscription.
+  useEffect(() => {
+    const ActionCable = window.ActionCable
+    if (!ActionCable?.createConsumer || cableRef.current) return
+    const url = (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/cable"
+    cableRef.current = ActionCable.createConsumer(url)
+  }, [])
+
   useEffect(() => {
     if (expandedSiteId == null) {
       if (subscriptionRef.current) {
@@ -47,45 +55,36 @@ function HomePage() {
       return
     }
     const siteId = Number(expandedSiteId)
-    if (!siteId) return
+    if (!siteId || !cableRef.current) return
     let cancelled = false
-    function connect() {
-      const ActionCable = window.ActionCable
-      if (cancelled || !ActionCable?.createConsumer) return
-      try {
-        const url = (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" + window.location.host + "/cable"
-        if (!cableRef.current) cableRef.current = ActionCable.createConsumer(url)
-        if (!cableRef.current) return
-        const sub = cableRef.current.subscriptions.create(
-          { channel: "SiteChannel", site_id: siteId },
-          {
-            received(data) {
-              const run = data.run
-              if (!run || !run.id) return
-              console.log("[Cable] run update", run.id, run.status)
-              const runSiteId = run.site_id
-              setRunsBySiteId((prev) => {
-                const list = prev[runSiteId] || []
-                const idx = list.findIndex((r) => r.id === run.id)
-                const next = idx >= 0 ? [...list.slice(0, idx), run, ...list.slice(idx + 1)] : [run, ...list]
-                return { ...prev, [runSiteId]: next }
-              })
-            },
-          }
-        )
-        subscriptionRef.current = sub
-      } catch (e) {
-        console.warn("[Cable] subscribe failed", e)
-      }
-    }
-    if (window.ActionCable) {
-      connect()
-    } else {
-      document.addEventListener("actioncable:ready", connect, { once: true })
+    try {
+      const sub = cableRef.current.subscriptions.create(
+        { channel: "SiteChannel", site_id: siteId },
+        {
+          received(data) {
+            const run = data.run
+            if (!run || !run.id) return
+            console.log("[Cable] run update", run.id, run.status)
+            const runSiteId = run.site_id
+            // Prefer terminal states so out-of-order "running" doesn't overwrite "completed"/"failed"
+            const terminal = (s) => s === "completed" || s === "failed"
+            setRunsBySiteId((prev) => {
+              const list = prev[runSiteId] || []
+              const idx = list.findIndex((r) => r.id === run.id)
+              const existing = idx >= 0 ? list[idx] : null
+              const use = existing && terminal(existing.status) && !terminal(run.status) ? existing : run
+              const next = idx >= 0 ? [...list.slice(0, idx), use, ...list.slice(idx + 1)] : [run, ...list]
+              return { ...prev, [runSiteId]: next }
+            })
+          },
+        }
+      )
+      subscriptionRef.current = sub
+    } catch (e) {
+      console.warn("[Cable] subscribe failed", e)
     }
     return () => {
       cancelled = true
-      document.removeEventListener("actioncable:ready", connect)
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
         subscriptionRef.current = null

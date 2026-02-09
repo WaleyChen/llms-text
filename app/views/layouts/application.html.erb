@@ -17,13 +17,6 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
 
-    <%# Load Action Cable before app so WebSocket connects (importmap dynamic import can fail) %>
-    <script type="module">
-      import("https://cdn.jsdelivr.net/npm/@rails/actioncable@7.0.0/+esm")
-        .then(function(m) { window.ActionCable = m.default; document.dispatchEvent(new Event("actioncable:ready")); })
-        .catch(function() { console.warn("[Cable] preload failed"); });
-    </script>
-
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>

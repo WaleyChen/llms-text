@@ -99,8 +99,8 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    <% if ENV["DATABASE_URL"] %>
-    url: <%= ENV["DATABASE_URL"] %>
+    <% if ENV["DATABASE_URL"].to_s != "" %>
+    url: <%= ENV["DATABASE_URL"].to_s.inspect %>
     <% else %>
     database: llms_text_production
     username: llms_text
@@ -113,9 +113,11 @@ production:
   # Use same DB as primary when CABLE_DATABASE_URL / QUEUE_DATABASE_URL not set (e.g. Heroku)
   queue:
     <<: *default
-    url: <%= ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
+    <% u = ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
+    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
     migrations_paths: db/queue_migrate
   cable:
     <<: *default
-    url: <%= ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
+    <% u = ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
+    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
     migrations_paths: db/cable_migrate

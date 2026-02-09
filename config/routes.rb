@@ -1,7 +1,9 @@
 Rails.application.routes.draw do
   resources :site_monitors
-  resources :runs
-  resources :sites
+  resources :runs, only: %i[index show]
+  resources :sites do
+    resources :runs, only: [:index], module: :sites
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

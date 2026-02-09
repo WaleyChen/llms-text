@@ -9,6 +9,9 @@ class GenerateLlmsTxtJob < ApplicationJob
 
     body = LlmsTxt::Crawler.get(url).body
     doc = Nokogiri::HTML(body)
+    extracted = LlmsTxt::PageExtractor.new(doc, url).to_h
+    puts extracted.inspect
+    # extracted => { title:, llms_txt_url:, associated_urls: }
 
     run.complete
   rescue Faraday::Error, SocketError, URI::InvalidURIError => e

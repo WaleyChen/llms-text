@@ -1,10 +1,22 @@
 class SitesController < ApplicationController
-    def create
-        @site = Site.create(site_params)
-        redirect_to @site
+  def index
+    @sites = Site.order(created_at: :desc)
+    respond_to do |format|
+      format.json { render json: @sites }
+      format.html { redirect_to root_path }
     end
+  end
 
-    private
+  def create
+    @site = Site.new(site_params)
+    if @site.save
+      redirect_to root_path, notice: "Site added."
+    else
+      redirect_to root_path, alert: @site.errors.full_messages.to_sentence
+    end
+  end
+
+  private
 
     def site_params
         params.require(:site).permit(:url)

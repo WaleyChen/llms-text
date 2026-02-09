@@ -1,8 +1,22 @@
-import { createElement } from "react"
+import { createElement, useState, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 
 function HomePage() {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || ""
+  const [sites, setSites] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/sites.json", {
+      headers: { Accept: "application/json" },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => {
+        setSites(Array.isArray(data) ? data : [])
+      })
+      .catch(() => setSites([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   return createElement(
     "div",
@@ -45,6 +59,25 @@ function HomePage() {
             }, "Generate")
           )
         )
+      ),
+      createElement(
+        "div",
+        { className: "sites-list-wrapper" },
+        loading
+          ? createElement("p", { className: "sites-list-message" }, "Loading…")
+          : sites.length === 0
+            ? createElement("p", { className: "sites-list-message" }, "No sites yet. Add one above.")
+            : createElement(
+                "ul",
+                { className: "sites-list" },
+                ...sites.map((site) =>
+                  createElement(
+                    "li",
+                    { key: site.id, className: "sites-list-item" },
+                    createElement("a", { href: site.url, target: "_blank", rel: "noopener noreferrer" }, site.url)
+                  )
+                )
+              )
       )
     )
   )

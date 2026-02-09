@@ -8,6 +8,7 @@ function HomePage() {
   const [expandedSiteId, setExpandedSiteId] = useState(null)
   const [runsBySiteId, setRunsBySiteId] = useState({})
   const [loadingRunsForId, setLoadingRunsForId] = useState(null)
+  const [startingRunForId, setStartingRunForId] = useState(null)
 
   useEffect(() => {
     fetch("/sites.json", {
@@ -34,6 +35,33 @@ function HomePage() {
       .catch(() => setRunsBySiteId((prev) => ({ ...prev, [expandedSiteId]: [] })))
       .finally(() => setLoadingRunsForId(null))
   }, [expandedSiteId])
+
+  function startRun(siteId, e) {
+    if (e) e.stopPropagation()
+    if (startingRunForId != null) return
+    setStartingRunForId(siteId)
+    fetch(`/sites/${siteId}/runs`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({}),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to start run")
+        return res.json()
+      })
+      .then((run) => {
+        setRunsBySiteId((prev) => ({
+          ...prev,
+          [siteId]: [run, ...(prev[siteId] || [])],
+        }))
+      })
+      .catch(() => {})
+      .finally(() => setStartingRunForId(null))
+  }
 
   function toggleSiteRuns(siteId) {
     if (expandedSiteId === siteId) {
@@ -126,7 +154,14 @@ function HomePage() {
                         rel: "noopener noreferrer",
                         className: "sites-list-site-url",
                         onClick: (e) => e.stopPropagation(),
-                      }, site.url)
+                      }, site.url),
+                      createElement("button", {
+                        type: "button",
+                        className: "sites-list-run-btn",
+                        "aria-label": "Start run",
+                        disabled: startingRunForId === site.id,
+                        onClick: (e) => startRun(site.id, e),
+                      }, startingRunForId === site.id ? "…" : "Run")
                     ),
                     isExpanded &&
                       createElement(

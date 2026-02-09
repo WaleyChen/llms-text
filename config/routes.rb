@@ -2,7 +2,7 @@ Rails.application.routes.draw do
   resources :site_monitors
   resources :runs, only: %i[index show]
   resources :sites do
-    resources :runs, only: [:index], module: :sites
+    resources :runs, only: %i[index create], module: :sites
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

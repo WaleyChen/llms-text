@@ -10,11 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_08_191401) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_09_015950) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "runs", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "site_id"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.string "status"
+    t.string "phase"
+  end
+
+  create_table "site_monitors", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
@@ -24,4 +34,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_08_191401) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
   end
+
+  add_foreign_key "runs", "sites"
 end

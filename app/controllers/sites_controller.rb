@@ -10,6 +10,8 @@ class SitesController < ApplicationController
   def create
     @site = Site.new(site_params)
     if @site.save
+      @run = Run.create(site_id: @site.id, status: Run::STATUS_PENDING)
+      @run.start()
       redirect_to root_path, notice: "Site added."
     else
       redirect_to root_path, alert: @site.errors.full_messages.to_sentence

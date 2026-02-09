@@ -79,6 +79,15 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
+  # Allow Action Cable WebSocket from the app origin (Heroku and custom domains).
+  config.action_cable.allowed_request_origins = [
+    %r{https://.*\.herokuapp\.com},
+    %r{https://.*\.herokuapp\.com:\d+}
+  ]
+  if (origin = ENV["ACTION_CABLE_ORIGIN"]).present?
+    config.action_cable.allowed_request_origins << %r{#{Regexp.escape(origin)}}
+  end
+
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [
   #   "example.com",     # Allow requests from example.com

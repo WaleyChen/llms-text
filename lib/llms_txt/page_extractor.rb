@@ -14,6 +14,11 @@ module LlmsTxt
         doc.at_css('meta[property="og:title"]')&.[]("content")&.strip.presence
     end
 
+    def description
+      doc.at_css('meta[name="description"]')&.[]("content")&.strip.presence ||
+        doc.at_css('meta[property="og:description"]')&.[]("content")&.strip.presence
+    end
+
     # All markdown-style links [text](url) from the page (for context)
     def associated_urls
       urls = []
@@ -29,6 +34,7 @@ module LlmsTxt
     def to_h
       {
         title: title,
+        description: description,
         associated_urls: associated_urls
       }
     end

@@ -11,7 +11,7 @@ class SitesController < ApplicationController
     @site = Site.new(site_params)
     if @site.save
       @run = Run.create(site_id: @site.id, status: Run::STATUS_PENDING)
-      @run.start()
+      GenerateLlmsTxtJob.perform_later(@run.id)
       redirect_to root_path, notice: "Site added."
     else
       redirect_to root_path, alert: @site.errors.full_messages.to_sentence

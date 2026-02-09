@@ -99,9 +99,13 @@ test:
 production:
   primary: &primary_production
     <<: *default
+    <% if ENV["DATABASE_URL"] %>
+    url: <%= ENV["DATABASE_URL"] %>
+    <% else %>
     database: llms_text_production
     username: llms_text
     password: <%= ENV["LLMS_TEXT_DATABASE_PASSWORD"] %>
+    <% end %>
   cache:
     <<: *primary_production
     database: llms_text_production_cache

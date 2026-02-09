@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  mount ActionCable.server => "/cable"
+
   resources :site_monitors
   resources :runs, only: %i[index show]
   resources :sites do

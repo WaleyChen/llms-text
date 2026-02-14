@@ -271,6 +271,13 @@ html, body {
   text-decoration: underline;
 }
 
+.sites-list-run-config {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: #666;
+  white-space: nowrap;
+}
+
 .sites-list-run-btn {
   flex-shrink: 0;
   padding: 0.25rem 0.6rem;

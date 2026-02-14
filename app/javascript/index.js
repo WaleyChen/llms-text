@@ -226,10 +226,11 @@ function HomePage() {
                   value: model,
                   onChange: (e) => setModel(e.target.value),
                 },
-                createElement("option", { value: "default" }, "Default"),
+                createElement("option", { value: "default" }, "Default (All)"),
                 createElement("option", { value: "opus-4.6" }, "Opus 4.6"),
                 createElement("option", { value: "claude-3.5" }, "Claude 3.5"),
-                createElement("option", { value: "gpt-4o" }, "GPT-4o")
+                createElement("option", { value: "gpt-4o" }, "GPT-4o"),
+                createElement("option", { value: "none" }, "None")
               )
             ),
             createElement("button", {
@@ -271,6 +272,10 @@ function HomePage() {
                         className: "sites-list-site-url",
                         onClick: (e) => e.stopPropagation(),
                       }, site.url),
+                      createElement("span", {
+                        className: "sites-list-run-config",
+                        "aria-label": "Run settings",
+                      }, `${maxPages} pages · ${maxDepth} depth · ${{ default: "Default (All)", "opus-4.6": "Opus 4.6", "claude-3.5": "Claude 3.5", "gpt-4o": "GPT-4o", none: "None" }[model] || model}`),
                       createElement("button", {
                         type: "button",
                         className: "sites-list-run-btn",

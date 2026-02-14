@@ -5,13 +5,38 @@ class GenerateLlmsTxtJob < ApplicationJob
     run = Run.find(run_id)
     run.start
 
-    url = run.site.url
+    # TODO: Think about valid and invalid URLs--return INVALID URLS to the user
+    #     Accept:
+    # pokemon.com
+    # www.pokemon.com
+    # https://pokemon.com
 
-    body = LlmsTxt::Crawler.get(url).body
-    doc = Nokogiri::HTML(body)
-    extracted = LlmsTxt::PageExtractor.new(doc, url).to_h
-    puts extracted.inspect
-    # extracted => { title:, llms_txt_url:, associated_urls: }
+    # http://pokemon.com/docs
+    # Normalize by:
+    # If no scheme → prepend https://
+    # Parse with a real URL parser (Addressable in Ruby)
+    # Canonicalize host (downcase, strip trailing slash)
+    # Reject private/internal IP ranges unless explicitly allowed
+
+    # optionally:
+    # enable multiple urls to be crawled at once
+    url = run.site.url
+    url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
+
+    # Crawl the site (use run options if set)
+    crawler = LlmsTxt::SiteCrawler.new(
+      url,
+      max_pages: run.respond_to?(:max_pages) ? run.max_pages : 20,
+      max_depth: run.respond_to?(:max_depth) ? run.max_depth : 3
+    )
+    pages = crawler.crawl
+
+    # Generate llms.txt content
+    generator = LlmsTxt::Generator.new(pages)
+    llms_txt_content = generator.generate
+
+    # TODO: Store llms_txt_content (e.g. add content:text column to runs, or save to file/S3)
+    puts llms_txt_content
 
     run.complete
   rescue Faraday::Error, SocketError, URI::InvalidURIError => e

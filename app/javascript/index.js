@@ -297,7 +297,15 @@ function HomePage() {
                                     createElement("span", { className: "sites-list-run-status" }, run.status),
                                     run.started_at &&
                                       createElement("span", { className: "sites-list-run-time" },
-                                        new Date(run.started_at).toLocaleString())
+                                        new Date(run.started_at).toLocaleString()),
+                                    run.status === "completed" &&
+                                      createElement("a", {
+                                        href: `/runs/${run.id}/llms_txt`,
+                                        target: "_blank",
+                                        rel: "noopener noreferrer",
+                                        className: "sites-list-run-view-btn",
+                                        onClick: (e) => e.stopPropagation(),
+                                      }, "View")
                                   )
                                 )
                               )

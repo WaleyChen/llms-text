@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_14_210000) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_14_222707) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -25,6 +25,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_14_210000) do
     t.integer "max_pages"
     t.integer "max_depth"
     t.string "model"
+    t.text "llms_txt"
   end
 
   create_table "site_monitors", force: :cascade do |t|

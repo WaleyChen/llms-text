@@ -35,9 +35,8 @@ class GenerateLlmsTxtJob < ApplicationJob
     generator = LlmsTxt::Generator.new(pages)
     llms_txt_content = generator.generate
 
-    # TODO: Store llms_txt_content (e.g. add content:text column to runs, or save to file/S3)
-    puts llms_txt_content
-
+    run.llms_txt = llms_txt_content
+    run.save
     run.complete
   rescue Faraday::Error, SocketError, URI::InvalidURIError => e
     run.fail

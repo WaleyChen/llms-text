@@ -57,28 +57,27 @@ html, body {
   flex-direction: column;
 }
 
-/* URL-only: single line, address-bar style */
+/* URL bar row, then options row beneath */
 .prompt-box--url.prompt-box-inner {
   min-height: 0;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
 }
 
-.prompt-box--url .prompt-input {
+.prompt-box-url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.prompt-box--url .prompt-box-url-row .prompt-input {
   flex: 1;
   min-width: 0;
   min-height: 0;
   margin-bottom: 0;
   padding: 0.5rem 0;
-}
-
-.prompt-box--url .prompt-box-footer {
-  flex: 0 0 auto;
-  padding-top: 0;
-  border-top: none;
 }
 
 .prompt-input {
@@ -106,13 +105,59 @@ html, body {
 .prompt-box-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding-top: 0.5rem;
   border-top: 1px solid #f0f0f0;
 }
 
+.prompt-box-options {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.prompt-box-options .prompt-submit-btn {
+  margin-left: auto;
+}
+
+.prompt-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #555;
+  cursor: default;
+}
+
+.prompt-option-label {
+  white-space: nowrap;
+}
+
+.prompt-option-select,
+.prompt-option-input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  color: #1a1a1a;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.prompt-option-select {
+  cursor: pointer;
+}
+
+.prompt-option-input {
+  width: 4rem;
+  box-sizing: border-box;
+}
+
 .prompt-submit-btn {
-  padding: 0.5rem 1.25rem;
+  padding: 0.5rem 1.5rem;
   font-size: 0.9375rem;
   font-weight: 500;
   color: #fff;

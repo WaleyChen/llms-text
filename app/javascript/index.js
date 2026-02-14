@@ -9,6 +9,9 @@ function HomePage() {
   const [runsBySiteId, setRunsBySiteId] = useState({})
   const [loadingRunsForId, setLoadingRunsForId] = useState(null)
   const [startingRunForId, setStartingRunForId] = useState(null)
+  const [maxPages, setMaxPages] = useState(20)
+  const [maxDepth, setMaxDepth] = useState(3)
+  const [model, setModel] = useState("default")
   const cableRef = useRef(null)
   const subscriptionRef = useRef(null)
 
@@ -103,7 +106,7 @@ function HomePage() {
         "Content-Type": "application/json",
         "X-CSRF-Token": csrfToken,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ max_pages: maxPages, max_depth: maxDepth, model: model || null }),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to start run")
@@ -160,18 +163,71 @@ function HomePage() {
             name: "authenticity_token",
             value: csrfToken,
           }),
-          createElement("input", {
-            id: "url",
-            type: "url",
-            name: "site[url]",
-            placeholder: "https://example.com",
-            autoComplete: "url",
-            className: "prompt-input",
-            "data-url-input-target": "input",
-          }),
           createElement(
             "div",
-            { className: "prompt-box-footer" },
+            { className: "prompt-box-url-row" },
+            createElement("input", {
+              id: "url",
+              type: "url",
+              name: "site[url]",
+              placeholder: "https://example.com",
+              autoComplete: "url",
+              className: "prompt-input",
+              "data-url-input-target": "input",
+            })
+          ),
+          createElement(
+            "div",
+            { className: "prompt-box-options" },
+            createElement(
+              "label",
+              { className: "prompt-option" },
+              createElement("span", { className: "prompt-option-label" }, "Max pages"),
+              createElement("input", {
+                type: "number",
+                className: "prompt-option-input",
+                min: 1,
+                max: 500,
+                value: maxPages,
+                onChange: (e) => {
+                  const n = parseInt(e.target.value, 10)
+                  if (!Number.isNaN(n) && n >= 1 && n <= 500) setMaxPages(n)
+                },
+              })
+            ),
+            createElement(
+              "label",
+              { className: "prompt-option" },
+              createElement("span", { className: "prompt-option-label" }, "Max depth"),
+              createElement("input", {
+                type: "number",
+                className: "prompt-option-input",
+                min: 1,
+                max: 10,
+                value: maxDepth,
+                onChange: (e) => {
+                  const n = parseInt(e.target.value, 10)
+                  if (!Number.isNaN(n) && n >= 1 && n <= 10) setMaxDepth(n)
+                },
+              })
+            ),
+            createElement(
+              "label",
+              { className: "prompt-option" },
+              createElement("span", { className: "prompt-option-label" }, "Model"),
+              createElement(
+                "select",
+                {
+                  className: "prompt-option-select",
+                  value: model,
+                  onChange: (e) => setModel(e.target.value),
+                },
+                createElement("option", { value: "default" }, "Default"),
+                createElement("option", { value: "opus-4.6" }, "Opus 4.6"),
+                createElement("option", { value: "claude-3.5" }, "Claude 3.5"),
+                createElement("option", { value: "gpt-4o" }, "GPT-4o")
+              )
+            ),
             createElement("button", {
               type: "submit",
               className: "prompt-submit-btn",

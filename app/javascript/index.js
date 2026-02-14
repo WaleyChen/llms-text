@@ -168,9 +168,9 @@ function HomePage() {
             { className: "prompt-box-url-row" },
             createElement("input", {
               id: "url",
-              type: "url",
+              type: "text",
               name: "site[url]",
-              placeholder: "https://example.com",
+              placeholder: "tryprofound.com",
               autoComplete: "url",
               className: "prompt-input",
               "data-url-input-target": "input",

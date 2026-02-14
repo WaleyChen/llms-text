@@ -181,13 +181,15 @@ function HomePage() {
             { className: "prompt-box-options" },
             createElement(
               "label",
-              { className: "prompt-option" },
+              { className: "prompt-option", htmlFor: "run-max-pages" },
               createElement("span", { className: "prompt-option-label" }, "Max pages"),
               createElement("input", {
+                id: "run-max-pages",
                 type: "number",
                 className: "prompt-option-input",
                 min: 1,
                 max: 500,
+                "aria-label": "Max pages to crawl",
                 value: maxPages,
                 onChange: (e) => {
                   const n = parseInt(e.target.value, 10)
@@ -197,13 +199,15 @@ function HomePage() {
             ),
             createElement(
               "label",
-              { className: "prompt-option" },
+              { className: "prompt-option", htmlFor: "run-max-depth" },
               createElement("span", { className: "prompt-option-label" }, "Max depth"),
               createElement("input", {
+                id: "run-max-depth",
                 type: "number",
                 className: "prompt-option-input",
                 min: 1,
                 max: 10,
+                "aria-label": "Max crawl depth",
                 value: maxDepth,
                 onChange: (e) => {
                   const n = parseInt(e.target.value, 10)

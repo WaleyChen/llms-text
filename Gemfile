@@ -25,6 +25,10 @@ gem "faraday-retry"
 # HTML/XML parsing
 gem "nokogiri"
 
+# LLM integration
+gem "langchainrb"
+gem "ruby-openai" # required by langchainrb for OpenAI
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
 

@@ -322,6 +322,23 @@ html, body {
   color: #666;
 }
 
+.run-configs-list-runs-table {
+  font-size: 0.8125rem;
+}
+
+.run-configs-list-runs-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  color: #555;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .run-configs-list-runs-list {
   list-style: none;
   margin: 0;
@@ -332,7 +349,6 @@ html, body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.8125rem;
   margin-bottom: 0.35rem;
 }
 
@@ -343,6 +359,22 @@ html, body {
 
 .run-configs-list-run-time {
   color: #666;
+  min-width: 10rem;
+}
+
+.run-configs-list-run-finished {
+  color: #666;
+  min-width: 10rem;
+}
+
+.run-configs-list-run-duration {
+  color: #666;
+  min-width: 3rem;
+}
+
+.run-configs-list-run-action {
+  min-width: 3rem;
+  margin-left: auto;
 }
 
 .run-configs-list-run-view-btn {

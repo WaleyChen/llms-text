@@ -126,12 +126,12 @@ function HomePage() {
     if (!startedAt || !finishedAt) return null
     const ms = new Date(finishedAt) - new Date(startedAt)
     if (ms < 0) return null
-    if (ms < 1000) return `${ms}ms`
-    const sec = Math.round(ms / 1000)
-    if (sec < 60) return `${sec}s`
+    if (ms < 1000) return `${Math.round(ms)}ms`
+    const sec = ms / 1000
+    if (sec < 60) return `${sec.toFixed(1)}s`
     const min = Math.floor(sec / 60)
     const s = sec % 60
-    return s ? `${min}m ${s}s` : `${min}m`
+    return s >= 0.05 ? `${min}m ${s.toFixed(1)}s` : `${min}m`
   }
 
   function toggleSiteRuns(siteId) {
@@ -360,27 +360,43 @@ function HomePage() {
                           : !runs || runs.length === 0
                             ? createElement("p", { className: "run-configs-list-runs-empty" }, "No runs yet.")
                             : createElement(
-                                "ul",
-                                { className: "run-configs-list-runs-list" },
-                                ...runs.map((run) =>
-                                  createElement(
-                                    "li",
-                                    { key: run.id, className: "run-configs-list-run" },
-                                    createElement("span", { className: "run-configs-list-run-status" }, run.status),
-                                    run.started_at &&
-                                      createElement("span", { className: "run-configs-list-run-time" },
-                                        new Date(run.started_at).toLocaleString()),
-                                    formatDuration(run.started_at, run.finished_at) &&
-                                      createElement("span", { className: "run-configs-list-run-duration" },
-                                        formatDuration(run.started_at, run.finished_at)),
-                                    run.status === "completed" &&
-                                      createElement("a", {
-                                        href: `/runs/${run.id}/llms_txt`,
-                                        target: "_blank",
-                                        rel: "noopener noreferrer",
-                                        className: "run-configs-list-run-view-btn",
-                                        onClick: (e) => e.stopPropagation(),
-                                      }, "View")
+                                "div",
+                                { className: "run-configs-list-runs-table" },
+                                createElement(
+                                  "div",
+                                  { className: "run-configs-list-runs-header" },
+                                  createElement("span", { className: "run-configs-list-run-status" }, "Status"),
+                                  createElement("span", { className: "run-configs-list-run-time" }, "Started"),
+                                  createElement("span", { className: "run-configs-list-run-finished" }, "Finished"),
+                                  createElement("span", { className: "run-configs-list-run-duration" }, "Duration"),
+                                  createElement("span", { className: "run-configs-list-run-action" })
+                                ),
+                                createElement(
+                                  "ul",
+                                  { className: "run-configs-list-runs-list" },
+                                  ...runs.map((run) =>
+                                    createElement(
+                                      "li",
+                                      { key: run.id, className: "run-configs-list-run" },
+                                      createElement("span", { className: "run-configs-list-run-status" }, run.status),
+                                      run.started_at
+                                        ? createElement("span", { className: "run-configs-list-run-time" }, new Date(run.started_at).toLocaleString())
+                                        : createElement("span", { className: "run-configs-list-run-time" }, "—"),
+                                      run.finished_at
+                                        ? createElement("span", { className: "run-configs-list-run-finished" }, new Date(run.finished_at).toLocaleString())
+                                        : createElement("span", { className: "run-configs-list-run-finished" }, "—"),
+                                      formatDuration(run.started_at, run.finished_at)
+                                        ? createElement("span", { className: "run-configs-list-run-duration" }, formatDuration(run.started_at, run.finished_at))
+                                        : createElement("span", { className: "run-configs-list-run-duration" }, "—"),
+                                      run.status === "completed"
+                                        ? createElement("a", {
+                                            href: `/runs/${run.id}/llms_txt`,
+                                            target: "_blank",
+                                            rel: "noopener noreferrer",
+                                            className: "run-configs-list-run-view-btn",
+                                          }, "View")
+                                        : createElement("span", { className: "run-configs-list-run-action" })
+                                    )
                                   )
                                 )
                               )

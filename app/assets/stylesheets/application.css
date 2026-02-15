@@ -324,61 +324,83 @@ html, body {
 
 .run-configs-list-runs-table {
   font-size: 0.8125rem;
+  display: grid;
+  grid-template-columns: 4.5rem 10rem 10rem 4rem 5.5rem 3rem;
+  gap: 0.75rem 0.35rem;
+  align-items: center;
 }
 
 .run-configs-list-runs-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0;
-  margin-bottom: 0.25rem;
+  display: contents;
+}
+
+.run-configs-list-runs-header > * {
   font-weight: 600;
   color: #555;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  padding: 0.25rem 0 0 0;
 }
 
 .run-configs-list-runs-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: contents;
 }
 
 .run-configs-list-run {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.35rem;
+  display: contents;
 }
 
 .run-configs-list-run-status {
   font-weight: 500;
-  min-width: 4.5rem;
 }
 
 .run-configs-list-run-time {
   color: #666;
-  min-width: 10rem;
 }
 
 .run-configs-list-run-finished {
   color: #666;
-  min-width: 10rem;
 }
 
 .run-configs-list-run-duration {
   color: #666;
-  min-width: 3rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.run-configs-list-run-model {
+  color: #666;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .run-configs-list-run-action {
-  min-width: 3rem;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.run-configs-list-run-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #e0e0e0;
+  border-top-color: #1a1a1a;
+  border-radius: 50%;
+  animation: run-configs-list-spin 0.7s linear infinite;
+}
+
+@keyframes run-configs-list-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .run-configs-list-run-view-btn {
-  flex-shrink: 0;
   padding: 0.2rem 0.5rem;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -386,7 +408,6 @@ html, body {
   background: #f0f0f0;
   border-radius: 6px;
   text-decoration: none;
-  margin-left: auto;
 }
 
 .run-configs-list-run-view-btn:hover {

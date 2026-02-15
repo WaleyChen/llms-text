@@ -369,6 +369,7 @@ function HomePage() {
                                   createElement("span", { className: "run-configs-list-run-time" }, "Started"),
                                   createElement("span", { className: "run-configs-list-run-finished" }, "Finished"),
                                   createElement("span", { className: "run-configs-list-run-duration" }, "Duration"),
+                                  createElement("span", { className: "run-configs-list-run-model" }, "Model"),
                                   createElement("span", { className: "run-configs-list-run-action" })
                                 ),
                                 createElement(
@@ -388,6 +389,7 @@ function HomePage() {
                                       formatDuration(run.started_at, run.finished_at)
                                         ? createElement("span", { className: "run-configs-list-run-duration" }, formatDuration(run.started_at, run.finished_at))
                                         : createElement("span", { className: "run-configs-list-run-duration" }, "—"),
+                                      createElement("span", { className: "run-configs-list-run-model" }, run.model || runConfig.model || "—"),
                                       run.status === "completed"
                                         ? createElement("a", {
                                             href: `/runs/${run.id}/llms_txt`,
@@ -395,7 +397,10 @@ function HomePage() {
                                             rel: "noopener noreferrer",
                                             className: "run-configs-list-run-view-btn",
                                           }, "View")
-                                        : createElement("span", { className: "run-configs-list-run-action" })
+                                        : run.status === "running"
+                                          ? createElement("span", { className: "run-configs-list-run-action", "aria-label": "Running" },
+                                              createElement("span", { className: "run-configs-list-run-spinner" }))
+                                          : createElement("span", { className: "run-configs-list-run-action" })
                                     )
                                   )
                                 )

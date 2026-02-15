@@ -39,9 +39,9 @@ module LlmsTxt
 
       body = nil
       begin
-        body = LlmsTxt::Crawler.get(url).body
+        body = LlmsTxt::Fetcher.get(url).body
       rescue Faraday::Error, SocketError, URI::InvalidURIError => e
-        Rails.logger.warn("[Crawler] Failed to crawl #{url}: #{e.message}")
+        Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{e.message}")
         return
       end
 

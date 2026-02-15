@@ -31,7 +31,7 @@ module LlmsTxt
       url
     end
 
-    def crawl_page(url, depth:)
+    def crawl_page(url, parent_url: nil, depth: 0)
       @mutex.synchronize do
         return if depth > @max_depth || @visited.include?(url) || @pages.size >= @max_pages
         @visited.add(url)
@@ -47,8 +47,11 @@ module LlmsTxt
 
       doc = Nokogiri::HTML(body)
       extractor = PageExtractor.new(doc, url)
+
       page_data = extractor.to_h.merge(url: url)
       page_data[:content] = extract_main_content(doc)
+      page_data[:parent_url] = parent_url
+      page_data[:depth] = depth
 
       links_to_follow = nil
       @mutex.synchronize do
@@ -58,12 +61,17 @@ module LlmsTxt
         end
       end
 
+      if Rails.env.development?
+        # puts "doc: #{doc.inspect}"
+        puts "links_to_follow: #{links_to_follow.inspect}"
+      end
+
       return if links_to_follow.blank?
 
       # Crawl follow links in parallel (thread pool)
       links_to_follow.each_slice(CONCURRENCY) do |batch|
         threads = batch.map do |link|
-          Thread.new { crawl_page(link, depth: depth + 1) }
+          Thread.new { crawl_page(link, parent_url: url, depth: depth + 1) }
         end
         threads.each(&:join)
       end

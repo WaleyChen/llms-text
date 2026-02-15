@@ -186,6 +186,16 @@ html, body {
   box-sizing: border-box;
 }
 
+.prompt-option-input::-webkit-outer-spin-button,
+.prompt-option-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.prompt-option-input[type="number"] {
+  appearance: textfield;
+}
+
 .prompt-submit-btn {
   padding: 0.5rem 1.5rem;
   font-size: 0.9375rem;

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_15_001000) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_15_004503) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,6 +18,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_15_001000) do
     t.string "url"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "max_pages"
+    t.integer "max_depth"
+    t.string "model"
   end
 
   create_table "runs", force: :cascade do |t|
@@ -28,8 +31,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_15_001000) do
     t.datetime "finished_at"
     t.string "status"
     t.string "phase"
-    t.integer "max_pages"
-    t.integer "max_depth"
     t.string "model"
     t.text "llms_txt"
   end

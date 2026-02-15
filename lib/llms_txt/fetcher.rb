@@ -5,7 +5,7 @@ require "ostruct"
 
 module LlmsTxt
   class Fetcher
-    CACHE_EXPIRY = 15.minutes
+    CACHE_EXPIRY = 1.day
 
     class << self
       def connection
@@ -22,16 +22,20 @@ module LlmsTxt
       end
 
       def get(url)
-        cache_key = "llms_txt_fetcher/#{Digest::SHA256.hexdigest(url)}"
+        cache_key = url
         cached = Rails.cache.read(cache_key)
         return response_with_body(cached) if cached
 
         response = connection.get(url) do |req|
           req.headers["User-Agent"] = "llms-txt-fetcher/0.1"
-          req.options.timeout = 5        # 5 minutes
-          req.options.open_timeout = 5   # 5 minutes
+          req.options.timeout = 30      # the total number of seconds to wait for the whole response
+          req.options.open_timeout = 10 # the numbers of seconds to establish a connection
         end
-        Rails.cache.write(cache_key, response.body, expires_in: CACHE_EXPIRY)
+
+        if response.success?
+          Rails.cache.write(cache_key, response.body, expires_in: CACHE_EXPIRY)
+        end
+
         response
       end
 

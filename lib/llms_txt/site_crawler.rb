@@ -39,7 +39,14 @@ module LlmsTxt
 
       body = nil
       begin
-        body = LlmsTxt::Fetcher.get(url).body
+        response = LlmsTxt::Fetcher.get(url)
+        status = response.status.to_i
+        if status >= 200 && status < 300
+          body = response.body
+        else
+          Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{response.status}")
+          return
+        end
       rescue Faraday::Error, SocketError, URI::InvalidURIError => e
         Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{e.message}")
         return

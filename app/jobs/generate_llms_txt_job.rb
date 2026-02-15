@@ -52,8 +52,9 @@ class GenerateLlmsTxtJob < ApplicationJob
     run.llms_txt = llms_txt_content
     run.save
     run.complete
-  rescue Faraday::Error, SocketError, URI::InvalidURIError => e
-    run.fail
+  # TODO: Test This and Write Tests
+  rescue StandardError => e
+    run&.fail
     raise e
   end
 end

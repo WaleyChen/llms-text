@@ -4,7 +4,7 @@ require "set"
 
 module LlmsTxt
   class SiteCrawler
-    IMPORTANT_PATHS = %w[/docs /documentation /api /about /guide /guides /tutorial /tutorials /help /support].freeze
+    # IMPORTANT_PATHS = %w[/docs /documentation /api /about /guide /guides /tutorial /tutorials /help /support].freeze
     DEFAULT_MAX_PAGES = 20
     DEFAULT_MAX_DEPTH = 3
     CONCURRENCY = 4
@@ -86,9 +86,8 @@ module LlmsTxt
       end.compact.uniq
 
       same_domain = links.select { |link| same_domain?(link) }
-      important = same_domain.select { |link| IMPORTANT_PATHS.any? { |path| link.include?(path) } }
-      other = same_domain - important
-      candidates = (important + other).first(10)
+      # important = same_domain.select { |link| IMPORTANT_PATHS.any? { |path| link.include?(path) } }
+      candidates = same_domain
 
       # Filter to only URLs we haven't visited and under limit (caller holds mutex conceptually; re-check in crawl_page)
       candidates

@@ -13,7 +13,7 @@ module RunConfigs
       attrs = { run_config_id: run_config.id, status: Run::STATUS_PENDING }
       attrs[:model] = run_params[:model] if run_params[:model].present?
       run = Run.create!(attrs)
-      GenerateLlmsTxtJob.perform_later(run.id)
+      GenerateLlmsTxtJob.perform_later(run.id, run.model || run_config.model)
       render json: run, status: :created
     end
 

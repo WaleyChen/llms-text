@@ -194,13 +194,13 @@ function HomePage() {
                 const data = await res.json().catch(() => ({}))
                 if (res.ok) {
                   const runConfig = data.run_config
-                  const run = data.run
+                  const runs = data.runs || (data.run ? [data.run] : [])
                   if (runConfig) {
                     setRunConfigs((prev) => [runConfig, ...prev])
-                    if (run) {
+                    if (runs.length > 0) {
                       setRunsBySiteId((prev) => ({
                         ...prev,
-                        [runConfig.id]: [run, ...(prev[runConfig.id] || [])],
+                        [runConfig.id]: [...runs, ...(prev[runConfig.id] || [])],
                       }))
                     }
                     setExpandedSiteId(runConfig.id)

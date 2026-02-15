@@ -33,10 +33,14 @@ class RunConfigsController < ApplicationController
     @run_config.assign_attributes(attrs.slice(:max_pages, :max_depth, :model))
 
     if @run_config.save
-      @run = Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING)
-      GenerateLlmsTxtJob.perform_later(@run.id)
+      @runs = [
+        Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: "N/A"),
+        Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: "gpt-5.2-mini"),
+      ]
+      GenerateLlmsTxtJob.perform_later(@runs[0].id)
+      GenerateLlmsTxtJob.perform_later(@runs[1].id)
       respond_to do |format|
-        format.json { render json: { run_config: @run_config, run: @run }, status: :created }
+        format.json { render json: { run_config: @run_config, runs: @runs }, status: :created }
         format.html { redirect_to root_path, notice: "Run config added." }
       end
     else

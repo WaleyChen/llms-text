@@ -1,7 +1,7 @@
 class GenerateLlmsTxtJob < ApplicationJob
   queue_as :default
 
-  def perform(run_id)
+  def perform(run_id) 
     run = Run.find(run_id)
     run.start
 
@@ -46,14 +46,14 @@ class GenerateLlmsTxtJob < ApplicationJob
     end
 
     # Generate llms.txt content
-    generator = LlmsTxt::Generator.new(pages)
+    generator = LlmsTxt::Generator.new(pages, run.model)
     llms_txt_content = generator.generate
 
     run.llms_txt = llms_txt_content
     run.save
     run.complete
   # TODO: Test This and Write Tests
-  rescue StandardError => e
+  rescue Exception => e
     run&.fail
     raise e
   end

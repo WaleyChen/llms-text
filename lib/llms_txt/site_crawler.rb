@@ -27,11 +27,18 @@ module LlmsTxt
     private
 
     def normalize_url(url)
+      url = url.to_s.strip
       url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
+      uri = URI.parse(url)
+      uri.query = nil
+      uri.fragment = nil
+      uri.to_s
+    rescue URI::InvalidURIError
       url
     end
 
     def crawl_page(url, parent_url: nil, depth: 0)
+      url = normalize_url(url)
       @mutex.synchronize do
         return if depth > @max_depth || @visited.include?(url) || @pages.size >= @max_pages
         @visited.add(url)

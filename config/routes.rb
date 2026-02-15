@@ -7,8 +7,8 @@ Rails.application.routes.draw do
       get :llms_txt
     end
   end
-  resources :sites do
-    resources :runs, only: %i[index create], module: :sites
+  resources :run_configs do
+    resources :runs, only: %i[index create], module: :run_configs
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

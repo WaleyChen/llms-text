@@ -20,7 +20,7 @@ class GenerateLlmsTxtJob < ApplicationJob
 
     # optionally:
     # enable multiple urls to be crawled at once
-    url = run.site.url
+    url = run.run_config.url
     url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
 
     # Crawl the site (use run options if set)

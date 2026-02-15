@@ -16,7 +16,7 @@ function HomePage() {
   const subscriptionRef = useRef(null)
 
   useEffect(() => {
-    fetch("/sites.json", {
+    fetch("/run_configs.json", {
       headers: { Accept: "application/json" },
     })
       .then((res) => res.ok ? res.json() : [])
@@ -32,7 +32,7 @@ function HomePage() {
   useEffect(() => {
     if (expandedSiteId == null || runsBySiteId[expandedSiteId] !== undefined) return
     setLoadingRunsForId(expandedSiteId)
-    fetch(`/sites/${expandedSiteId}/runs.json`, { headers: { Accept: "application/json" } })
+    fetch(`/run_configs/${expandedSiteId}/runs.json`, { headers: { Accept: "application/json" } })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         setRunsBySiteId((prev) => ({ ...prev, [expandedSiteId]: Array.isArray(data) ? data : [] }))
@@ -62,22 +62,22 @@ function HomePage() {
     let cancelled = false
     try {
       const sub = cableRef.current.subscriptions.create(
-        { channel: "SiteChannel", site_id: siteId },
+        { channel: "RunConfigChannel", run_config_id: siteId },
         {
           received(data) {
             const run = data.run
             if (!run || !run.id) return
             console.log("[Cable] run update", run.id, run.status)
-            const runSiteId = run.site_id
+            const runConfigId = run.run_config_id
             // Prefer terminal states so out-of-order "running" doesn't overwrite "completed"/"failed"
             const terminal = (s) => s === "completed" || s === "failed"
             setRunsBySiteId((prev) => {
-              const list = prev[runSiteId] || []
+              const list = prev[runConfigId] || []
               const idx = list.findIndex((r) => r.id === run.id)
               const existing = idx >= 0 ? list[idx] : null
               const use = existing && terminal(existing.status) && !terminal(run.status) ? existing : run
               const next = idx >= 0 ? [...list.slice(0, idx), use, ...list.slice(idx + 1)] : [run, ...list]
-              return { ...prev, [runSiteId]: next }
+              return { ...prev, [runConfigId]: next }
             })
           },
         }
@@ -99,7 +99,7 @@ function HomePage() {
     if (e) e.stopPropagation()
     if (startingRunForId != null) return
     setStartingRunForId(siteId)
-    fetch(`/sites/${siteId}/runs`, {
+    fetch(`/run_configs/${siteId}/runs`, {
       method: "POST",
       headers: {
         "Accept": "application/json",
@@ -130,7 +130,7 @@ function HomePage() {
     setExpandedSiteId(siteId)
     if (runsBySiteId[siteId] === undefined) {
       setLoadingRunsForId(siteId)
-      fetch(`/sites/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
+      fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
           setRunsBySiteId((prev) => ({ ...prev, [siteId]: Array.isArray(data) ? data : [] }))
@@ -154,7 +154,7 @@ function HomePage() {
           "form",
           {
             className: "prompt-box-inner prompt-box--url",
-            action: "/sites",
+            action: "/run_configs",
             method: "post",
             acceptCharset: "utf-8",
           },
@@ -169,7 +169,7 @@ function HomePage() {
             createElement("input", {
               id: "url",
               type: "text",
-              name: "site[url]",
+              name: "run_config[url]",
               placeholder: "tryprofound.com",
               autoComplete: "url",
               className: "prompt-input",
@@ -242,73 +242,73 @@ function HomePage() {
       ),
       createElement(
         "div",
-        { className: "sites-list-wrapper" },
+        { className: "run-configs-list-wrapper" },
         loading
-          ? createElement("p", { className: "sites-list-message" }, "Loading…")
-          : sites.length === 0
-            ? createElement("p", { className: "sites-list-message" }, "No sites yet. Add one above.")
+          ? createElement("p", { className: "run-configs-list-message" }, "Loading…")
+          : runConfigs.length === 0
+            ? createElement("p", { className: "run-configs-list-message" }, "No run configs yet. Add one above.")
             : createElement(
                 "ul",
-                { className: "sites-list" },
-                ...sites.map((site) => {
-                  const isExpanded = expandedSiteId === site.id
-                  const runs = runsBySiteId[site.id]
-                  const loadingRuns = loadingRunsForId === site.id
+                { className: "run-configs-list" },
+                ...runConfigs.map((runConfig) => {
+                  const isExpanded = expandedSiteId === runConfig.id
+                  const runs = runsBySiteId[runConfig.id]
+                  const loadingRuns = loadingRunsForId === runConfig.id
                   return createElement(
                     "li",
-                    { key: site.id, className: "sites-list-item" },
+                    { key: runConfig.id, className: "run-configs-list-item" },
                     createElement(
                       "button",
                       {
                         type: "button",
-                        className: "sites-list-site-row",
-                        onClick: () => toggleSiteRuns(site.id),
+                        className: "run-configs-list-site-row",
+                        onClick: () => toggleSiteRuns(runConfig.id),
                       },
-                      createElement("span", { className: "sites-list-site-expand" }, isExpanded ? "▼" : "▶"),
+                      createElement("span", { className: "run-configs-list-site-expand" }, isExpanded ? "▼" : "▶"),
                       createElement("a", {
-                        href: site.url,
+                        href: runConfig.url,
                         target: "_blank",
                         rel: "noopener noreferrer",
-                        className: "sites-list-site-url",
+                        className: "run-configs-list-site-url",
                         onClick: (e) => e.stopPropagation(),
-                      }, site.url),
+                      }, runConfig.url),
                       createElement("span", {
-                        className: "sites-list-run-config",
+                        className: "run-configs-list-run-config",
                         "aria-label": "Run settings",
-                      }, `${maxPages} pages · ${maxDepth} depth · ${{ default: "Default (All)", "opus-4.6": "Opus 4.6", "claude-3.5": "Claude 3.5", "gpt-4o": "GPT-4o", none: "None" }[model] || model}`),
+                      }, `${runConfig.maxPages} pages · ${runConfig.maxDepth} depth · ${runConfig.model || "Default"}`),
                       createElement("button", {
                         type: "button",
-                        className: "sites-list-run-btn",
+                        className: "run-configs-list-run-btn",
                         "aria-label": "Start run",
-                        disabled: startingRunForId === site.id,
-                        onClick: (e) => startRun(site.id, e),
-                      }, startingRunForId === site.id ? "…" : "Run")
+                        disabled: startingRunForId === runConfig.id,
+                        onClick: (e) => startRun(runConfig.id, e),
+                      }, startingRunForId === runConfig.id ? "…" : "Run")
                     ),
                     isExpanded &&
                       createElement(
                         "div",
-                        { className: "sites-list-runs" },
+                        { className: "run-configs-list-runs" },
                         loadingRuns
-                          ? createElement("p", { className: "sites-list-runs-loading" }, "Loading runs…")
+                          ? createElement("p", { className: "run-configs-list-runs-loading" }, "Loading runs…")
                           : !runs || runs.length === 0
-                            ? createElement("p", { className: "sites-list-runs-empty" }, "No runs yet.")
+                            ? createElement("p", { className: "run-configs-list-runs-empty" }, "No runs yet.")
                             : createElement(
                                 "ul",
-                                { className: "sites-list-runs-list" },
+                                { className: "run-configs-list-runs-list" },
                                 ...runs.map((run) =>
                                   createElement(
                                     "li",
-                                    { key: run.id, className: "sites-list-run" },
-                                    createElement("span", { className: "sites-list-run-status" }, run.status),
+                                    { key: run.id, className: "run-configs-list-run" },
+                                    createElement("span", { className: "run-configs-list-run-status" }, run.status),
                                     run.started_at &&
-                                      createElement("span", { className: "sites-list-run-time" },
+                                      createElement("span", { className: "run-configs-list-run-time" },
                                         new Date(run.started_at).toLocaleString()),
                                     run.status === "completed" &&
                                       createElement("a", {
                                         href: `/runs/${run.id}/llms_txt`,
                                         target: "_blank",
                                         rel: "noopener noreferrer",
-                                        className: "sites-list-run-view-btn",
+                                        className: "run-configs-list-run-view-btn",
                                         onClick: (e) => e.stopPropagation(),
                                       }, "View")
                                   )

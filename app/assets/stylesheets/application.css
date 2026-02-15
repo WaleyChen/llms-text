@@ -211,29 +211,29 @@ html, body {
 }
 
 /* Sites list below the prompt box */
-.sites-list-wrapper {
+.run-configs-list-wrapper {
   max-width: 48rem;
   width: 100%;
   margin: 0 auto;
 }
 
-.sites-list-message {
+.run-configs-list-message {
   margin: 0;
   font-size: 0.9375rem;
   color: #666;
 }
 
-.sites-list {
+.run-configs-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.sites-list-item {
+.run-configs-list-item {
   margin-bottom: 0.5rem;
 }
 
-.sites-list-site-row {
+.run-configs-list-site-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -246,18 +246,18 @@ html, body {
   text-align: left;
 }
 
-.sites-list-site-row:hover {
+.run-configs-list-site-row:hover {
   background: rgba(0, 0, 0, 0.04);
   border-radius: 6px;
 }
 
-.sites-list-site-expand {
+.run-configs-list-site-expand {
   flex-shrink: 0;
   font-size: 0.6rem;
   color: #666;
 }
 
-.sites-list-site-url {
+.run-configs-list-site-url {
   color: #1a1a1a;
   text-decoration: none;
   font-size: 0.9375rem;
@@ -267,18 +267,18 @@ html, body {
   text-overflow: ellipsis;
 }
 
-.sites-list-site-url:hover {
+.run-configs-list-site-url:hover {
   text-decoration: underline;
 }
 
-.sites-list-run-config {
+.run-configs-list-run-config {
   flex-shrink: 0;
   font-size: 0.8125rem;
   color: #666;
   white-space: nowrap;
 }
 
-.sites-list-run-btn {
+.run-configs-list-run-btn {
   flex-shrink: 0;
   padding: 0.25rem 0.6rem;
   font-size: 0.8125rem;
@@ -290,35 +290,35 @@ html, body {
   cursor: pointer;
 }
 
-.sites-list-run-btn:hover:not(:disabled) {
+.run-configs-list-run-btn:hover:not(:disabled) {
   background: #e0e0e0;
 }
 
-.sites-list-run-btn:disabled {
+.run-configs-list-run-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
-.sites-list-runs {
+.run-configs-list-runs {
   margin: 0.5rem 0 0.75rem 1.25rem;
   padding-left: 0.5rem;
   border-left: 2px solid #e0e0e0;
 }
 
-.sites-list-runs-loading,
-.sites-list-runs-empty {
+.run-configs-list-runs-loading,
+.run-configs-list-runs-empty {
   margin: 0;
   font-size: 0.8125rem;
   color: #666;
 }
 
-.sites-list-runs-list {
+.run-configs-list-runs-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.sites-list-run {
+.run-configs-list-run {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -326,16 +326,16 @@ html, body {
   margin-bottom: 0.35rem;
 }
 
-.sites-list-run-status {
+.run-configs-list-run-status {
   font-weight: 500;
   min-width: 4.5rem;
 }
 
-.sites-list-run-time {
+.run-configs-list-run-time {
   color: #666;
 }
 
-.sites-list-run-view-btn {
+.run-configs-list-run-view-btn {
   flex-shrink: 0;
   padding: 0.2rem 0.5rem;
   font-size: 0.8125rem;
@@ -347,7 +347,7 @@ html, body {
   margin-left: auto;
 }
 
-.sites-list-run-view-btn:hover {
+.run-configs-list-run-view-btn:hover {
   background: #e0e0e0;
 }
 

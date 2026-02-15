@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-module Sites
+module RunConfigs
   class RunsController < ApplicationController
     def index
-      site = Site.find(params[:site_id])
-      runs = site.runs.order(created_at: :desc)
+      run_config = RunConfig.find(params[:run_config_id])
+      runs = run_config.runs.order(created_at: :desc)
       render json: runs
     end
 
     def create
-      site = Site.find(params[:site_id])
-      attrs = { site_id: site.id, status: Run::STATUS_PENDING }
+      run_config = RunConfig.find(params[:run_config_id])
+      attrs = { run_config_id: run_config.id, status: Run::STATUS_PENDING }
       attrs[:max_pages] = run_params[:max_pages].to_i if run_params[:max_pages].present?
       attrs[:max_depth] = run_params[:max_depth].to_i if run_params[:max_depth].present?
       attrs[:model] = run_params[:model] if run_params[:model].present?

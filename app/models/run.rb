@@ -1,7 +1,7 @@
 class Run < ApplicationRecord
-  belongs_to :site
+  belongs_to :run_config
   has_one :site_monitor
-  validates :site_id, presence: true
+  validates :run_config_id, presence: true
 
   after_create_commit :broadcast_run_update
   after_update_commit :broadcast_run_update
@@ -35,7 +35,7 @@ class Run < ApplicationRecord
   private
 
   def broadcast_run_update
-    SiteChannel.broadcast_to(site, { run: as_json })
+    RunConfigChannel.broadcast_to(run_config, { run: as_json })
   rescue => e
     Rails.logger.warn("[Cable] broadcast failed: #{e.message}")
   end

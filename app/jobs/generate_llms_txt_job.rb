@@ -24,7 +24,7 @@ class GenerateLlmsTxtJob < ApplicationJob
     url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
 
     # Crawl the site (use run options if set)
-    crawler = LlmsTxt::SiteCrawler.new(
+    crawler = LlmsTxt::Crawler.new(
       url,
       max_pages: run.run_config.max_pages,
       max_depth: run.run_config.max_depth

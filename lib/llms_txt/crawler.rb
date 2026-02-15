@@ -3,7 +3,7 @@
 require "set"
 
 module LlmsTxt
-  class SiteCrawler
+  class Crawler
     # IMPORTANT_PATHS = %w[/docs /documentation /api /about /guide /guides /tutorial /tutorials /help /support].freeze
     DEFAULT_MAX_PAGES = 20
     DEFAULT_MAX_DEPTH = 3
@@ -12,6 +12,7 @@ module LlmsTxt
     def initialize(base_url, max_pages: nil, max_depth: nil)
       @base_url = normalize_url(base_url)
       @base_uri = URI.parse(@base_url)
+      @scheme = @base_uri.scheme
       @max_pages = max_pages || DEFAULT_MAX_PAGES
       @max_depth = max_depth || DEFAULT_MAX_DEPTH
       @visited = Set.new
@@ -26,22 +27,37 @@ module LlmsTxt
 
     private
 
+    # Normalize a URL by:
+    # - Stripping whitespace
+    # - Prepending the scheme if no scheme
+    # - Removing query parameters and fragment
+    # - Returning the normalized URL
     def normalize_url(url)
       url = url.to_s.strip
-      url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
+      url = "#{@scheme}://#{url}" unless url.match?(%r{\Ahttps?://}i) # prepend scheme if no scheme
       uri = URI.parse(url)
-      uri.query = nil
-      uri.fragment = nil
+      uri.query = nil # remove query parameters
+      uri.fragment = nil # remove fragment, the part after the # symbol
       uri.to_s
+    rescue URI::InvalidURIError
+      url
+    end
+
+    # Scheme-agnostic key so http and https versions of the same page count as one visit.
+    def visited_key(url)
+      uri = URI.parse(url)
+      path = uri.path.to_s.empty? ? "/" : uri.path
+      "#{uri.host}#{path}"
     rescue URI::InvalidURIError
       url
     end
 
     def crawl_page(url, parent_url: nil, depth: 0)
       url = normalize_url(url)
+      visited_key = visited_key(url)
       @mutex.synchronize do
-        return if depth > @max_depth || @visited.include?(url) || @pages.size >= @max_pages
-        @visited.add(url)
+        return if depth > @max_depth || @visited.include?(visited_key) || @pages.size >= @max_pages
+        @visited.add(visited_key)
       end
 
       body = nil
@@ -100,11 +116,6 @@ module LlmsTxt
       end.compact.uniq
 
       same_domain = links.select { |link| same_domain?(link) }
-      # important = same_domain.select { |link| IMPORTANT_PATHS.any? { |path| link.include?(path) } }
-      candidates = same_domain
-
-      # Filter to only URLs we haven't visited and under limit (caller holds mutex conceptually; re-check in crawl_page)
-      candidates
     end
 
     def same_domain?(url)

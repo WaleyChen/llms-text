@@ -54,7 +54,9 @@ module LlmsTxt
     end
 
     def pages_for_first_segment(segment)
-      @pages.select { |p| first_segment_for_url(p[:url]) == segment }
+      @pages
+        .select { |p| first_segment_for_url(p[:url]) == segment }
+        .sort_by { |p| (p[:title] || extract_title_from_url(p[:url])).to_s.downcase } # sort by title, case-insensitive
     end
 
     def extract_title_from_url(url)

@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client"
 
 function HomePage() {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || ""
-  const [sites, setSites] = useState([])
+  const [runConfigs, setRunConfigs] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedSiteId, setExpandedSiteId] = useState(null)
   const [runsBySiteId, setRunsBySiteId] = useState({})
@@ -22,10 +22,10 @@ function HomePage() {
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         const list = Array.isArray(data) ? data : []
-        setSites(list)
+        setRunConfigs(list)
         if (list.length > 0) setExpandedSiteId(list[0].id)
       })
-      .catch(() => setSites([]))
+      .catch(() => setRunConfigs([]))
       .finally(() => setLoading(false))
   }, [])
 
@@ -157,6 +157,50 @@ function HomePage() {
             action: "/run_configs",
             method: "post",
             acceptCharset: "utf-8",
+            async onSubmit(e) {
+              e.preventDefault()
+              const form = e.target
+              const url = form.querySelector('input[name="run_config[url]"]')?.value?.trim() || ""
+              const payload = {
+                run_config: {
+                  url,
+                  max_pages: maxPages === "" ? null : Number(maxPages),
+                  max_depth: maxDepth === "" ? null : Number(maxDepth),
+                  model: model || "default",
+                },
+              }
+              try {
+                const res = await fetch("/run_configs", {
+                  method: "POST",
+                  headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken,
+                  },
+                  body: JSON.stringify(payload),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.ok) {
+                  const runConfig = data.run_config
+                  const run = data.run
+                  if (runConfig) {
+                    setRunConfigs((prev) => [runConfig, ...prev])
+                    if (run) {
+                      setRunsBySiteId((prev) => ({
+                        ...prev,
+                        [runConfig.id]: [run, ...(prev[runConfig.id] || [])],
+                      }))
+                    }
+                    setExpandedSiteId(runConfig.id)
+                  }
+                } else {
+                  const msg = data.errors?.join?.(" ") || "Failed to add run config"
+                  alert(msg)
+                }
+              } catch (err) {
+                alert("Failed to add run config")
+              }
+            },
           },
           createElement("input", {
             type: "hidden",
@@ -182,36 +226,46 @@ function HomePage() {
             createElement(
               "label",
               { className: "prompt-option", htmlFor: "run-max-pages" },
-              createElement("span", { className: "prompt-option-label" }, "Max pages"),
+              createElement("span", { className: "prompt-option-label" }, "Max Pages"),
               createElement("input", {
                 id: "run-max-pages",
                 type: "number",
+                name: "run_config[max_pages]",
                 className: "prompt-option-input",
                 min: 1,
-                max: 500,
+                max: 999,
                 "aria-label": "Max pages to crawl",
-                value: maxPages,
+                value: maxPages === "" ? "" : maxPages,
                 onChange: (e) => {
-                  const n = parseInt(e.target.value, 10)
-                  if (!Number.isNaN(n) && n >= 1 && n <= 500) setMaxPages(n)
+                  const v = e.target.value
+                  if (v === "") setMaxPages("")
+                  else {
+                    const n = parseInt(v, 10)
+                    if (!Number.isNaN(n) && n >= 1 && n <= 999) setMaxPages(n)
+                  }
                 },
               })
             ),
             createElement(
               "label",
               { className: "prompt-option", htmlFor: "run-max-depth" },
-              createElement("span", { className: "prompt-option-label" }, "Max depth"),
+              createElement("span", { className: "prompt-option-label" }, "Max Depth"),
               createElement("input", {
                 id: "run-max-depth",
                 type: "number",
+                name: "run_config[max_depth]",
                 className: "prompt-option-input",
                 min: 1,
                 max: 10,
                 "aria-label": "Max crawl depth",
-                value: maxDepth,
+                value: maxDepth === "" ? "" : maxDepth,
                 onChange: (e) => {
-                  const n = parseInt(e.target.value, 10)
-                  if (!Number.isNaN(n) && n >= 1 && n <= 10) setMaxDepth(n)
+                  const v = e.target.value
+                  if (v === "") setMaxDepth("")
+                  else {
+                    const n = parseInt(v, 10)
+                    if (!Number.isNaN(n) && n >= 1 && n <= 10) setMaxDepth(n)
+                  }
                 },
               })
             ),
@@ -222,6 +276,7 @@ function HomePage() {
               createElement(
                 "select",
                 {
+                  name: "run_config[model]",
                   className: "prompt-option-select",
                   value: model,
                   onChange: (e) => setModel(e.target.value),
@@ -275,7 +330,7 @@ function HomePage() {
                       createElement("span", {
                         className: "run-configs-list-run-config",
                         "aria-label": "Run settings",
-                      }, `${runConfig.maxPages} pages · ${runConfig.maxDepth} depth · ${runConfig.model || "Default"}`),
+                      }, `${runConfig.max_pages} pages · ${runConfig.max_depth} depth · ${runConfig.model || "Default"}`),
                       createElement("button", {
                         type: "button",
                         className: "run-configs-list-run-btn",

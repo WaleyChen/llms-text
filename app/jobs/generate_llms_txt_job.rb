@@ -26,10 +26,24 @@ class GenerateLlmsTxtJob < ApplicationJob
     # Crawl the site (use run options if set)
     crawler = LlmsTxt::SiteCrawler.new(
       url,
-      max_pages: run.respond_to?(:max_pages) ? run.max_pages : 20,
-      max_depth: run.respond_to?(:max_depth) ? run.max_depth : 3
+      max_pages: run.run_config.max_pages,
+      max_depth: run.run_config.max_depth
     )
     pages = crawler.crawl
+
+    if Rails.env.development?
+      for i in 0..pages.size - 1
+        page = pages[i]
+        puts "page #{i} url: #{page[:url]}"
+        puts "page #{i} parent_url: #{page[:parent_url]}"
+        puts "page #{i} depth: #{page[:depth]}"
+        puts "page #{i} title: #{page[:title]}"
+        puts "page #{i} description: #{page[:description]}"
+        puts "page #{i} associated_urls: #{page[:associated_urls]}"
+        puts "page #{i} content: #{page[:content]}"
+        puts "--------------------------------"
+      end
+    end
 
     # Generate llms.txt content
     generator = LlmsTxt::Generator.new(pages)

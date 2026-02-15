@@ -122,6 +122,18 @@ function HomePage() {
       .finally(() => setStartingRunForId(null))
   }
 
+  function formatDuration(startedAt, finishedAt) {
+    if (!startedAt || !finishedAt) return null
+    const ms = new Date(finishedAt) - new Date(startedAt)
+    if (ms < 0) return null
+    if (ms < 1000) return `${ms}ms`
+    const sec = Math.round(ms / 1000)
+    if (sec < 60) return `${sec}s`
+    const min = Math.floor(sec / 60)
+    const s = sec % 60
+    return s ? `${min}m ${s}s` : `${min}m`
+  }
+
   function toggleSiteRuns(siteId) {
     if (expandedSiteId === siteId) {
       setExpandedSiteId(null)
@@ -358,6 +370,9 @@ function HomePage() {
                                     run.started_at &&
                                       createElement("span", { className: "run-configs-list-run-time" },
                                         new Date(run.started_at).toLocaleString()),
+                                    formatDuration(run.started_at, run.finished_at) &&
+                                      createElement("span", { className: "run-configs-list-run-duration" },
+                                        formatDuration(run.started_at, run.finished_at)),
                                     run.status === "completed" &&
                                       createElement("a", {
                                         href: `/runs/${run.id}/llms_txt`,

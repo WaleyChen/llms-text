@@ -12,6 +12,7 @@ function HomePage() {
   const [maxPages, setMaxPages] = useState(20)
   const [maxDepth, setMaxDepth] = useState(3)
   const [model, setModel] = useState("default")
+  const [debugMode, setDebugMode] = useState(false)
   const cableRef = useRef(null)
   const subscriptionRef = useRef(null)
 
@@ -106,7 +107,7 @@ function HomePage() {
         "Content-Type": "application/json",
         "X-CSRF-Token": csrfToken,
       },
-      body: JSON.stringify({ max_pages: maxPages, max_depth: maxDepth, model: model || null }),
+      body: JSON.stringify({ max_pages: maxPages, max_depth: maxDepth, model: model || null, debug: debugMode }),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to start run")
@@ -179,6 +180,7 @@ function HomePage() {
                   max_pages: maxPages === "" ? null : Number(maxPages),
                   max_depth: maxDepth === "" ? null : Number(maxDepth),
                   model: model || "default",
+                  debug: debugMode,
                 },
               }
               try {
@@ -299,6 +301,17 @@ function HomePage() {
                 createElement("option", { value: "gpt-4o" }, "GPT-4o"),
                 createElement("option", { value: "none" }, "None")
               )
+            ),
+            createElement(
+              "label",
+              { className: "prompt-option prompt-box-debug-toggle" },
+              createElement("span", { className: "prompt-option-label" }, "Debug"),
+              createElement("input", {
+                type: "checkbox",
+                checked: debugMode,
+                onChange: (e) => setDebugMode(e.target.checked),
+                "aria-label": "Debug mode",
+              })
             ),
             createElement("button", {
               type: "submit",

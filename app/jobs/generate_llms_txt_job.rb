@@ -1,52 +1,20 @@
 class GenerateLlmsTxtJob < ApplicationJob
   queue_as :default
 
-  def perform(run_id) 
+  def perform(run_id)
     run = Run.find(run_id)
     run.start
 
-    # TODO: Think about valid and invalid URLs--return INVALID URLS to the user
-    #     Accept:
-    # pokemon.com
-    # www.pokemon.com
-    # https://pokemon.com
-
-    # http://pokemon.com/docs
-    # Normalize by:
-    # If no scheme → prepend https://
-    # Parse with a real URL parser (Addressable in Ruby)
-    # Canonicalize host (downcase, strip trailing slash)
-    # Reject private/internal IP ranges unless explicitly allowed
-
-    # optionally:
-    # enable multiple urls to be crawled at once
-    url = run.run_config.url
-    url = "https://#{url}" unless url.match?(%r{\Ahttps?://}i)
-
-    # Crawl the site (use run options if set)
-    crawler = LlmsTxt::Crawler.new(
-      url,
-      max_pages: run.run_config.max_pages,
-      max_depth: run.run_config.max_depth
-    )
-    pages = crawler.crawl
-
-    if Rails.env.development?
-      for i in 0..pages.size - 1
-        page = pages[i]
-        puts "page #{i} url: #{page[:url]}"
-        puts "page #{i} parent_url: #{page[:parent_url]}"
-        puts "page #{i} depth: #{page[:depth]}"
-        puts "page #{i} title: #{page[:title]}"
-        puts "page #{i} description: #{page[:description]}"
-        puts "page #{i} associated_urls: #{page[:associated_urls]}"
-        puts "page #{i} content: #{page[:content]}"
-        puts "--------------------------------"
-      end
+    crawl = Rails.cache.read("crawl:#{run.run_config_id}")
+    unless crawl
+      run.fail
+      raise "Crawl result expired or not found for run_config #{run.run_config_id}"
     end
 
-    # Generate llms.txt content
-    generator = LlmsTxt::Generator.new(pages, run.model)
+    pages = crawl[:pages] || crawl["pages"] || []
+    failed_pages = crawl[:failed_pages] || crawl["failed_pages"] || []
+
+    generator = LlmsTxt::Generator.new(pages, failed_pages, run.model)
     llms_txt_content = generator.generate
 
     run.llms_txt = llms_txt_content

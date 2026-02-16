@@ -12,6 +12,9 @@ class Run < ApplicationRecord
   STATUS_FAILED   = "failed"
   STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED].freeze
 
+  MODEL_NONE       = "N/A"
+  MODEL_GPT_5_2_MINI = "gpt-5.2-mini"
+
   validates :status, inclusion: { in: STATUSES }
 
   def start

@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require "set"
+
 module LlmsTxt
   class Generator
-    def initialize(pages, model)
+    def initialize(pages, failed_pages, model)
       @pages = pages
+      @num_pages_displayed = 0
+      @displayed_urls = Set.new
+      @failed_pages = failed_pages
       @homepage = pages.first
       @model = model
     end
@@ -15,11 +20,26 @@ module LlmsTxt
       lines << "> #{homepage_description}"
       lines << ""
 
+      if @model == Run::MODEL_NONE
+        generate_with_no_model(lines)
+      else
+        generate_with_model(@model, lines)
+      end
+      add_debug_info(lines)
+
+      lines.join("\n")
+    end
+
+    private
+
+    def generate_with_no_model(lines)
       overview_pages = pages_for_overview
       unless overview_pages.empty?
         lines << "## Overview"
         lines << ""
         overview_pages.each do |page|
+          @num_pages_displayed += 1
+          @displayed_urls.add(page[:url])
           title = page[:title] || extract_title_from_url(page[:url])
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
@@ -35,11 +55,16 @@ module LlmsTxt
 
       first_path_segments.each do |segment|
         section_pages = pages_for_first_segment(segment)
-        next if section_pages.size <= 1
+        next if section_pages.length == 0
+        # Skip pages with 1 path segment that are already included in the Overview section
+        next if section_pages.length == 1 and path_segment_count(section_pages.first[:url]) <= 1
 
         lines << "## #{segment.capitalize}"
         lines << ""
         section_pages.each do |page|
+          next if path_segment_count(page[:url]) <= 1 # Skip pages with 1 path segment since they are already in the Overview section
+          @num_pages_displayed += 1
+          @displayed_urls.add(page[:url])
           title = page[:title] || extract_title_from_url(page[:url])
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
@@ -48,16 +73,118 @@ module LlmsTxt
             line += " (depth: #{page[:depth]})"
             line += " (parent_url: #{page[:parent_url]})"
           end
-          
+
           lines << line
         end
         lines << ""
       end
-
-      lines.join("\n")
     end
 
-    private
+    def generate_with_model(model, lines)
+      return generate_with_no_model(lines) unless ENV["OPENAI_API_KEY"].present?
+
+      sections = fetch_sections_from_llm
+      if sections.is_a?(Hash) && sections.any?
+        render_llm_sections(sections, lines)
+      else
+        generate_with_no_model(lines)
+      end
+    end
+
+    def fetch_sections_from_llm
+      url_list = @pages.map do |p|
+        title = p[:title] || extract_title_from_url(p[:url])
+        desc = p[:description].to_s.strip
+        line = "- #{p[:url]} (title: #{title})"
+        line += " - #{desc.length > 80 ? "#{desc[0..80]}..." : desc}" if desc.present?
+        line
+      end.join("\n")
+
+      prompt = <<~PROMPT
+        Given these URLs from a website crawl, group them into logical sections for an llms.txt file.
+        For each URL, provide:
+        - title: clean, human-readable (fix casing, remove extra words, make it concise)
+        - description: a brief 1-2 sentence description for LLMs (what the page is about, who it's for)
+        Return ONLY valid JSON. No markdown, no explanation.
+        Format: {"Section Name": [{"url": "url1", "title": "Clean Title", "description": "Brief description for LLMs."}, {"url": "url2", "title": "Another Title", "description": "..."}], "Another Section": [{"url": "url3", "title": "Title", "description": "..."}]}
+        Use an "Overview" section for top-level pages (e.g. /about, /pricing). Group related pages (e.g. docs, blog) into their own sections.
+        Order sections by importance (Overview first, then main sections).
+
+        URLs:
+        #{url_list}
+      PROMPT
+
+      llm = Langchain::LLM::OpenAI.new(
+        api_key: ENV["OPENAI_API_KEY"],
+        default_options: { chat_model: openai_model, temperature: 0.2 }
+      )
+      response = llm.chat(messages: [{ role: "user", content: prompt }])
+      raw = response.chat_completion.to_s.strip
+      # Strip markdown code blocks if present
+      raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
+      JSON.parse(raw)
+    rescue Exception => e
+      Rails.logger.warn("[Generator] LLM section identification failed: #{e.message}")
+      nil
+    end
+
+    def render_llm_sections(sections, lines)
+      page_by_url = @pages.index_by { |p| p[:url].to_s }
+
+      sections.each do |section_name, urls|
+        next if urls.blank?
+
+        lines << "## #{section_name}"
+        lines << ""
+        Array(urls).each do |item|
+          url_str = item.is_a?(Hash) ? (item["url"] || item[:url]).to_s.strip : item.to_s.strip
+          page = page_by_url[url_str] || page_by_url.values.find { |p| p[:url].to_s == url_str }
+          next unless page
+
+          @num_pages_displayed += 1
+          @displayed_urls.add(page[:url])
+          title = if item.is_a?(Hash) && (item["title"].present? || item[:title].present?)
+            (item["title"] || item[:title]).to_s.strip
+          else
+            page[:title] || extract_title_from_url(page[:url])
+          end
+          description = if item.is_a?(Hash) && (item["description"].present? || item[:description].present?)
+            (item["description"] || item[:description]).to_s.strip
+          else
+            page[:description].to_s.strip
+          end
+          line = "- [#{title}](#{page[:url]})"
+          line += ": #{description}" if description.present?
+
+          if Rails.env.development?
+            line += " (depth: #{page[:depth]})"
+            line += " (parent_url: #{page[:parent_url]})"
+          end
+          lines << line
+        end
+        lines << ""
+      end
+    end
+
+    # ------------------------------------------------------------
+
+    def add_debug_info(lines)
+      if Rails.env.development?
+        lines << "## Total Pages: #{@pages.size}"
+        lines << "## Total Pages Displayed: #{@num_pages_displayed}"
+        lines << "## Total Failed Pages: #{@failed_pages.size}"
+        lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
+        pages_not_displayed.each do |page|
+          lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
+        end
+        lines << "## Failed Pages"
+        lines << @failed_pages.inspect
+      end
+    end
+
+    def pages_not_displayed
+      @pages.reject { |p| @displayed_urls.include?(p[:url]) }
+    end
 
     def homepage_description
       return generate_description_via_openai if use_ai_description?
@@ -67,9 +194,9 @@ module LlmsTxt
     end
 
     def use_ai_description?
-      return true if @model.to_s.downcase.in?(%w[gpt-5.2-mini])
+      return true if @model.to_s.downcase == Run::MODEL_GPT_5_2_MINI
       return false if @model.blank?
-      return false if @model.to_s.downcase.in?(%w[n/a none])
+      return false if @model.to_s.downcase.in?([Run::MODEL_NONE.downcase, "none"])
 
       ENV["OPENAI_API_KEY"].present?
     end
@@ -83,7 +210,7 @@ module LlmsTxt
       )
       content = build_description_context
       prompt = <<~PROMPT
-        Write a brief 1-2 sentence description for this website's llms.txt file.
+        Write a brief 2-4 sentence description for this website's llms.txt file.
         Be concise and informative. Output only the description, no quotes or preamble.
 
         Site title: #{@homepage[:title] || 'Untitled'}
@@ -100,6 +227,7 @@ module LlmsTxt
     def openai_model
       case @model.to_s.downcase
       when "gpt-4o" then "gpt-4o"
+      when "gpt-5.2-mini" then "gpt-4o-mini"
       when "opus-4.6", "claude-3.5" then "gpt-4o" # map non-OpenAI to gpt-4o
       else "gpt-4o"
       end
@@ -113,6 +241,11 @@ module LlmsTxt
       text.length > 2000 ? "#{text[0...2000]}..." : text
     end
 
+    # Returns the number of path segments in the URL
+    # Examples:
+    # https://example.com/ → 0
+    # https://example.com/about → 1
+    # https://example.com/docs/guides/getting-started → 3
     def path_segment_count(url)
       uri = URI.parse(url)
       path = uri.path.to_s
@@ -121,6 +254,11 @@ module LlmsTxt
       0
     end
 
+    # Returns the pages for the overview section
+    # The overview section is the pages with 1 path segment
+    # Examples:
+    # https://example.com/about
+    # https://example.com/docs
     def pages_for_overview
       @pages
         .select { |p| path_segment_count(p[:url]) == 1 }
@@ -143,7 +281,7 @@ module LlmsTxt
 
     def pages_for_first_segment(segment)
       @pages
-        .select { |p| first_segment_for_url(p[:url]) == segment }
+        .select { |p| first_segment_for_url(p[:url]) == segment and path_segment_count(p[:url]) > 1 }
         .sort_by { |p| (p[:title] || extract_title_from_url(p[:url])).to_s.downcase } # sort by title, case-insensitive
     end
 

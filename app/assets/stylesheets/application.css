@@ -72,6 +72,26 @@ html, body {
   width: 100%;
 }
 
+.prompt-box-debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #606060;
+  cursor: pointer;
+  user-select: none;
+}
+
+.prompt-box-debug-toggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #1a1a1a;
+}
+
+.prompt-box-debug-label {
+  font-size: 0.875rem;
+}
+
 .prompt-box--url .prompt-box-url-row .prompt-input {
   flex: 1;
   min-width: 0;

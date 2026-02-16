@@ -4,10 +4,9 @@ require "set"
 
 module LlmsTxt
   class Crawler
-    # IMPORTANT_PATHS = %w[/docs /documentation /api /about /guide /guides /tutorial /tutorials /help /support].freeze
     DEFAULT_MAX_PAGES = 20
     DEFAULT_MAX_DEPTH = 3
-    CONCURRENCY = 4
+    CONCURRENCY = 4 #TODOS: Set to 1 when already cached, otherwise 4
 
     def initialize(base_url, max_pages: nil, max_depth: nil)
       @base_url = normalize_url(base_url)
@@ -17,12 +16,13 @@ module LlmsTxt
       @max_depth = max_depth || DEFAULT_MAX_DEPTH
       @visited = Set.new
       @pages = []
+      @failed_pages = []
       @mutex = Mutex.new
     end
 
     def crawl
       crawl_page(@base_url, depth: 0)
-      @pages
+      {pages: @pages, failed_pages: @failed_pages}
     end
 
     private
@@ -56,7 +56,7 @@ module LlmsTxt
       url = normalize_url(url)
       visited_key = visited_key(url)
       @mutex.synchronize do
-        return if depth > @max_depth || @visited.include?(visited_key) || @pages.size >= @max_pages
+        return if depth > @max_depth || @visited.include?(visited_key) || @pages.size - 1 >= @max_pages # -1 because we exclude the homepage from llms.txt
         @visited.add(visited_key)
       end
 
@@ -71,17 +71,18 @@ module LlmsTxt
           return
         end
       rescue Faraday::Error, SocketError, URI::InvalidURIError => e
+        @failed_pages << {url: url, status: status, error: e.message}
         Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{e.message}")
         return
       end
 
       doc = Nokogiri::HTML(body)
       extractor = PageExtractor.new(doc, url)
-
       page_data = extractor.to_h.merge(url: url)
       page_data[:content] = extract_main_content(doc)
       page_data[:parent_url] = parent_url
       page_data[:depth] = depth
+      page_data[:javascript_rendered] = LlmsTxt::Fetcher.javascript_rendered?(body)
 
       links_to_follow = nil
       @mutex.synchronize do

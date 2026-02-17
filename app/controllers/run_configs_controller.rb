@@ -27,17 +27,22 @@ class RunConfigsController < ApplicationController
     
     attrs[:max_pages] = attrs[:max_pages].to_s.blank? ? 20 : attrs[:max_pages].to_i
     attrs[:max_depth] = attrs[:max_depth].to_s.blank? ? 3 : attrs[:max_depth].to_i
-    attrs[:model] = attrs[:model].presence || "default"
+    attrs[:model] = attrs[:model].presence || Run::MODEL_NONE
 
     @run_config = RunConfig.new(url: attrs[:url])
     @run_config.assign_attributes(attrs.slice(:max_pages, :max_depth, :model))
 
     if @run_config.save
-      @runs = [
-        Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: Run::MODEL_NONE),
-        Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: Run::MODEL_GPT_5_2_MINI),
-      ]
+      if @run_config.model == Run::MODEL_ALL
+        Run::MODELS.each do |model|
+          @runs << Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: model)
+        end
+      else
+        @runs = [Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: @run_config.model)]
+      end
+
       CrawlJob.perform_later(@run_config.id)
+
       respond_to do |format|
         format.json { render json: { run_config: @run_config, runs: @runs }, status: :created }
         format.html { redirect_to root_path, notice: "Run config added." }

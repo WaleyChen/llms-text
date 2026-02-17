@@ -5,10 +5,11 @@ Rails.application.routes.draw do
   resources :runs, only: %i[index show] do
     member do
       get :llms_txt
+      get :debug
     end
   end
   resources :run_configs do
-    resources :runs, only: %i[index create], module: :run_configs
+    resources :runs, only: %i[index], module: :run_configs
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

@@ -4,13 +4,14 @@ require "set"
 
 module LlmsTxt
   class Generator
-    def initialize(pages, failed_pages, model)
-      @pages = pages
+    def initialize(run, pages, failed_pages)
+      @debug = run.run_config.debug
+      @homepage = pages.first
+      @pages = pages.drop(1) # drop the homepage from the pages array
       @num_pages_displayed = 0
       @displayed_urls = Set.new
       @failed_pages = failed_pages
-      @homepage = pages.first
-      @model = model
+      @model = run.model
     end
 
     def generate
@@ -44,7 +45,7 @@ module LlmsTxt
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
 
-          if Rails.env.development?
+          if @debug
             line += " (depth: #{page[:depth]})"
             line += " (parent_url: #{page[:parent_url]})"
           end
@@ -69,7 +70,7 @@ module LlmsTxt
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
 
-          if Rails.env.development?
+          if @debug
             line += " (depth: #{page[:depth]})"
             line += " (parent_url: #{page[:parent_url]})"
           end
@@ -81,14 +82,22 @@ module LlmsTxt
     end
 
     def generate_with_model(model, lines)
-      return generate_with_no_model(lines) unless ENV["OPENAI_API_KEY"].present?
-
+      return generate_with_no_model(lines) unless llm_available?
       sections = fetch_sections_from_llm
-      if sections.is_a?(Hash) && sections.any?
-        render_llm_sections(sections, lines)
+      render_llm_sections(sections, lines)
+      render_missing_pages(lines)
+    end
+
+    def llm_available?
+      if claude_model?
+        ENV["ANTHROPIC_API_KEY"].present?
       else
-        generate_with_no_model(lines)
+        ENV["OPENAI_API_KEY"].present?
       end
+    end
+
+    def claude_model?
+      @model.to_s.downcase == Run::MODEL_CLAUDE_SONNET_4_5.downcase
     end
 
     def fetch_sections_from_llm
@@ -103,27 +112,49 @@ module LlmsTxt
       prompt = <<~PROMPT
         Given these URLs from a website crawl, group them into logical sections for an llms.txt file.
         For each URL, provide:
-        - title: clean, human-readable (fix casing, remove extra words, make it concise)
+        - title: clean, human-readable (fix casing, remove the product, company or website name from the title if it's present, remove extra words, make it concise)
         - description: a brief 1-2 sentence description for LLMs (what the page is about, who it's for)
         Return ONLY valid JSON. No markdown, no explanation.
-        Format: {"Section Name": [{"url": "url1", "title": "Clean Title", "description": "Brief description for LLMs."}, {"url": "url2", "title": "Another Title", "description": "..."}], "Another Section": [{"url": "url3", "title": "Title", "description": "..."}]}
-        Use an "Overview" section for top-level pages (e.g. /about, /pricing). Group related pages (e.g. docs, blog) into their own sections.
+        Format: {
+          "Section Name": [
+            {"url": "url1", "title": "Clean Title", "description": "Brief description for LLMs."},
+            {"url": "url2", "title": "Another Title", "description": "..."}
+          ],
+          "Another Section": [
+            {"url": "url3", "title": "Title", "description": "..."}
+          ]
+        }
+        Use an "Overview" section for top-level pages (e.g. /about, /pricing).
+        Group related pages (e.g. docs, blog) into their own sections.
         Order sections by importance (Overview first, then main sections).
+        The sum of the number of urls across all sections must be the same as the number of urls in the input.
 
         URLs:
         #{url_list}
       PROMPT
 
-      llm = Langchain::LLM::OpenAI.new(
-        api_key: ENV["OPENAI_API_KEY"],
-        default_options: { chat_model: openai_model, temperature: 0.2 }
-      )
+      llm = if claude_model?
+        Langchain::LLM::Anthropic.new(
+          api_key: ENV["ANTHROPIC_API_KEY"],
+          default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.2, max_tokens: 8192 }
+        )
+      else
+        Langchain::LLM::OpenAI.new(
+          api_key: ENV["OPENAI_API_KEY"],
+          default_options: { chat_model: openai_model, temperature: 0.2 }
+        )
+      end
+
+      if claude_model?
+        puts "Claude model: #{llm.inspect.pretty_inspect}"
+      end
+      
       response = llm.chat(messages: [{ role: "user", content: prompt }])
       raw = response.chat_completion.to_s.strip
       # Strip markdown code blocks if present
       raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
       JSON.parse(raw)
-    rescue Exception => e
+    rescue StandardError => e
       Rails.logger.warn("[Generator] LLM section identification failed: #{e.message}")
       nil
     end
@@ -166,10 +197,23 @@ module LlmsTxt
       end
     end
 
+    def render_missing_pages(lines)
+      return if pages_not_displayed.empty?
+
+      lines << "## Misc"
+      lines << ""
+      pages_not_displayed.each do |page|
+        lines << "- [#{page[:title] || extract_title_from_url(page[:url])}](#{page[:url]}): #{page[:description].to_s.strip}"
+
+        @num_pages_displayed += 1
+        @displayed_urls.add(page[:url])
+      end
+    end
+
     # ------------------------------------------------------------
 
     def add_debug_info(lines)
-      if Rails.env.development?
+      if @debug
         lines << "## Total Pages: #{@pages.size}"
         lines << "## Total Pages Displayed: #{@num_pages_displayed}"
         lines << "## Total Failed Pages: #{@failed_pages.size}"
@@ -195,19 +239,27 @@ module LlmsTxt
 
     def use_ai_description?
       return true if @model.to_s.downcase == Run::MODEL_GPT_5_2_MINI
+      return true if claude_model?
       return false if @model.blank?
       return false if @model.to_s.downcase.in?([Run::MODEL_NONE.downcase, "none"])
 
-      ENV["OPENAI_API_KEY"].present?
+      llm_available?
     end
 
     def generate_description_via_openai
-      puts "Generating description via OpenAI for model: #{@model}"
+      puts "Generating description via LLM for model: #{@model}"
 
-      llm = Langchain::LLM::OpenAI.new(
-        api_key: ENV["OPENAI_API_KEY"],
-        default_options: { chat_model: openai_model, temperature: 0.3 }
-      )
+      llm = if claude_model?
+        Langchain::LLM::Anthropic.new(
+          api_key: ENV["ANTHROPIC_API_KEY"],
+          default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.3, max_tokens: 512 }
+        )
+      else
+        Langchain::LLM::OpenAI.new(
+          api_key: ENV["OPENAI_API_KEY"],
+          default_options: { chat_model: openai_model, temperature: 0.3 }
+        )
+      end
       content = build_description_context
       prompt = <<~PROMPT
         Write a brief 2-4 sentence description for this website's llms.txt file.
@@ -219,8 +271,8 @@ module LlmsTxt
       PROMPT
       response = llm.chat(messages: [{ role: "user", content: prompt }])
       response.chat_completion.to_s.strip.presence || "No description available."
-    rescue Exception => e
-      Rails.logger.warn("[Generator] OpenAI description failed: #{e.message}")
+    rescue StandardError => e
+      Rails.logger.warn("[Generator] LLM description failed: #{e.message}")
       "No description available."
     end
 

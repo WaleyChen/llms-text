@@ -12,8 +12,11 @@ class Run < ApplicationRecord
   STATUS_FAILED   = "failed"
   STATUSES = [STATUS_PENDING, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED].freeze
 
+  MODEL_ALL        = "all"
   MODEL_NONE       = "N/A"
+  MODEL_CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
   MODEL_GPT_5_2_MINI = "gpt-5.2-mini"
+  MODELS = [MODEL_NONE, MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2_MINI].freeze
 
   validates :status, inclusion: { in: STATUSES }
 

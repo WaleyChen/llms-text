@@ -30,6 +30,7 @@ gem "ferrum"
 
 # LLM integration
 gem "langchainrb"
+gem "ruby-anthropic" # required by langchainrb for Claude (uses access_token; official "anthropic" gem uses api_key)
 gem "ruby-openai" # required by langchainrb for OpenAI
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]

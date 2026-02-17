@@ -287,18 +287,47 @@ html, body {
   color: #666;
 }
 
+.run-configs-list-site-url-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
 .run-configs-list-site-url {
   color: #1a1a1a;
   text-decoration: none;
   font-size: 0.9375rem;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .run-configs-list-site-url:hover {
   text-decoration: underline;
+}
+
+.run-configs-list-use-url-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+}
+
+.run-configs-list-use-url-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1a1a1a;
 }
 
 .run-configs-list-run-config {
@@ -345,9 +374,10 @@ html, body {
 .run-configs-list-runs-table {
   font-size: 0.8125rem;
   display: grid;
-  grid-template-columns: 4.5rem 10rem 10rem 4rem 5.5rem 3rem;
+  grid-template-columns: 4.5rem 10rem 10rem 4rem 5.5rem minmax(7rem, auto);
   gap: 0.75rem 0.35rem;
   align-items: center;
+  min-width: 0;
 }
 
 .run-configs-list-runs-header {
@@ -432,6 +462,21 @@ html, body {
 
 .run-configs-list-run-view-btn:hover {
   background: #e0e0e0;
+}
+
+.run-configs-list-run-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.run-configs-list-run-debug-btn {
+  color: #666;
+}
+
+.run-configs-list-run-debug-btn:hover {
+  background: #e8e8e8;
+  color: #1a1a1a;
 }
 
 .hello-react {

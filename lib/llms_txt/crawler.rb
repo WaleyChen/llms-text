@@ -70,8 +70,8 @@ module LlmsTxt
           Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{response.status}")
           return
         end
-      rescue Faraday::Error, SocketError, URI::InvalidURIError => e
-        @failed_pages << {url: url, status: status, error: e.message}
+      rescue StandardError => e
+        @failed_pages << {url: url, error: e.message}
         Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{e.message}")
         return
       end

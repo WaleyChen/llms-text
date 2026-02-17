@@ -5,16 +5,14 @@ function HomePage() {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || ""
   const [runConfigs, setRunConfigs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expandedSiteId, setExpandedSiteId] = useState(null)
+  const [expandedSiteIds, setExpandedSiteIds] = useState(() => new Set())
   const [runsBySiteId, setRunsBySiteId] = useState({})
-  const [loadingRunsForId, setLoadingRunsForId] = useState(null)
-  const [startingRunForId, setStartingRunForId] = useState(null)
+  const [loadingRunsForIds, setLoadingRunsForIds] = useState(() => new Set())
   const [maxPages, setMaxPages] = useState(20)
   const [maxDepth, setMaxDepth] = useState(3)
-  const [model, setModel] = useState("default")
-  const [debugMode, setDebugMode] = useState(false)
+  const [model, setModel] = useState("all")
   const cableRef = useRef(null)
-  const subscriptionRef = useRef(null)
+  const subscriptionsRef = useRef({})
 
   useEffect(() => {
     fetch("/run_configs.json", {
@@ -24,23 +22,30 @@ function HomePage() {
       .then((data) => {
         const list = Array.isArray(data) ? data : []
         setRunConfigs(list)
-        if (list.length > 0) setExpandedSiteId(list[0].id)
+        if (list.length > 0) setExpandedSiteIds((prev) => new Set([...prev, list[0].id]))
       })
       .catch(() => setRunConfigs([]))
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    if (expandedSiteId == null || runsBySiteId[expandedSiteId] !== undefined) return
-    setLoadingRunsForId(expandedSiteId)
-    fetch(`/run_configs/${expandedSiteId}/runs.json`, { headers: { Accept: "application/json" } })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        setRunsBySiteId((prev) => ({ ...prev, [expandedSiteId]: Array.isArray(data) ? data : [] }))
-      })
-      .catch(() => setRunsBySiteId((prev) => ({ ...prev, [expandedSiteId]: [] })))
-      .finally(() => setLoadingRunsForId(null))
-  }, [expandedSiteId])
+    const toFetch = [...expandedSiteIds].filter((id) => runsBySiteId[id] === undefined && !loadingRunsForIds.has(id))
+    if (toFetch.length === 0) return
+    setLoadingRunsForIds((prev) => new Set([...prev, ...toFetch]))
+    toFetch.forEach((siteId) => {
+      fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          setRunsBySiteId((prev) => ({ ...prev, [siteId]: Array.isArray(data) ? data : [] }))
+        })
+        .catch(() => setRunsBySiteId((prev) => ({ ...prev, [siteId]: [] })))
+        .finally(() => setLoadingRunsForIds((prev) => {
+          const next = new Set(prev)
+          next.delete(siteId)
+          return next
+        }))
+    })
+  }, [expandedSiteIds])
 
   // Connect to Action Cable once on mount so the WebSocket is open before any subscription.
   useEffect(() => {
@@ -51,77 +56,44 @@ function HomePage() {
   }, [])
 
   useEffect(() => {
-    if (expandedSiteId == null) {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe()
-        subscriptionRef.current = null
+    if (!cableRef.current) return
+    const ids = [...expandedSiteIds].map(Number).filter(Boolean)
+    const subs = subscriptionsRef.current
+    ids.forEach((siteId) => {
+      if (subs[siteId]) return
+      try {
+        subs[siteId] = cableRef.current.subscriptions.create(
+          { channel: "RunConfigChannel", run_config_id: siteId },
+          {
+            received(data) {
+              const run = data.run
+              if (!run || !run.id) return
+              console.log("[Cable] run update", run.id, run.status)
+              const runConfigId = run.run_config_id
+              const terminal = (s) => s === "completed" || s === "failed"
+              setRunsBySiteId((prev) => {
+                const list = prev[runConfigId] || []
+                const idx = list.findIndex((r) => r.id === run.id)
+                const existing = idx >= 0 ? list[idx] : null
+                const use = existing && terminal(existing.status) && !terminal(run.status) ? existing : run
+                const next = idx >= 0 ? [...list.slice(0, idx), use, ...list.slice(idx + 1)] : [run, ...list]
+                return { ...prev, [runConfigId]: next }
+              })
+            },
+          }
+        )
+      } catch (e) {
+        console.warn("[Cable] subscribe failed for", siteId, e)
       }
-      return
-    }
-    const siteId = Number(expandedSiteId)
-    if (!siteId || !cableRef.current) return
-    let cancelled = false
-    try {
-      const sub = cableRef.current.subscriptions.create(
-        { channel: "RunConfigChannel", run_config_id: siteId },
-        {
-          received(data) {
-            const run = data.run
-            if (!run || !run.id) return
-            console.log("[Cable] run update", run.id, run.status)
-            const runConfigId = run.run_config_id
-            // Prefer terminal states so out-of-order "running" doesn't overwrite "completed"/"failed"
-            const terminal = (s) => s === "completed" || s === "failed"
-            setRunsBySiteId((prev) => {
-              const list = prev[runConfigId] || []
-              const idx = list.findIndex((r) => r.id === run.id)
-              const existing = idx >= 0 ? list[idx] : null
-              const use = existing && terminal(existing.status) && !terminal(run.status) ? existing : run
-              const next = idx >= 0 ? [...list.slice(0, idx), use, ...list.slice(idx + 1)] : [run, ...list]
-              return { ...prev, [runConfigId]: next }
-            })
-          },
-        }
-      )
-      subscriptionRef.current = sub
-    } catch (e) {
-      console.warn("[Cable] subscribe failed", e)
-    }
-    return () => {
-      cancelled = true
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe()
-        subscriptionRef.current = null
-      }
-    }
-  }, [expandedSiteId])
-
-  function startRun(siteId, e) {
-    if (e) e.stopPropagation()
-    if (startingRunForId != null) return
-    setStartingRunForId(siteId)
-    fetch(`/run_configs/${siteId}/runs`, {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify({ max_pages: maxPages, max_depth: maxDepth, model: model || null, debug: debugMode }),
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to start run")
-        return res.json()
-      })
-      .then((run) => {
-        setRunsBySiteId((prev) => ({
-          ...prev,
-          [siteId]: [run, ...(prev[siteId] || [])],
-        }))
-      })
-      .catch(() => {})
-      .finally(() => setStartingRunForId(null))
-  }
+    Object.keys(subs).forEach((key) => {
+      const id = Number(key)
+      if (!expandedSiteIds.has(id)) {
+        subs[id]?.unsubscribe()
+        delete subs[id]
+      }
+    })
+  }, [expandedSiteIds])
 
   function formatDuration(startedAt, finishedAt) {
     if (!startedAt || !finishedAt) return null
@@ -136,21 +108,55 @@ function HomePage() {
   }
 
   function toggleSiteRuns(siteId) {
-    if (expandedSiteId === siteId) {
-      setExpandedSiteId(null)
-      return
+    setExpandedSiteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(siteId)) {
+        next.delete(siteId)
+      } else {
+        next.add(siteId)
+      }
+      return next
+    })
+  }
+
+  function fillUrlInput(url) {
+    const input = document.getElementById("url")
+    if (input) {
+      input.value = url
+      input.focus()
     }
-    setExpandedSiteId(siteId)
-    if (runsBySiteId[siteId] === undefined) {
-      setLoadingRunsForId(siteId)
-      fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
-        .then((res) => (res.ok ? res.json() : []))
-        .then((data) => {
-          setRunsBySiteId((prev) => ({ ...prev, [siteId]: Array.isArray(data) ? data : [] }))
-        })
-        .catch(() => setRunsBySiteId((prev) => ({ ...prev, [siteId]: [] })))
-        .finally(() => setLoadingRunsForId(null))
-    }
+  }
+
+  function useUrlIcon(url) {
+    return createElement(
+      "button",
+      {
+        type: "button",
+        className: "run-configs-list-use-url-btn",
+        "aria-label": "Use this URL in the form",
+        title: "Use this URL",
+        onClick: (e) => {
+          e.stopPropagation()
+          fillUrlInput(url)
+        },
+      },
+      createElement(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: 2,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          "aria-hidden": true,
+        },
+        createElement("path", { d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" }),
+        createElement("rect", { x: "8", y: "2", width: "8", height: "4", rx: "1", ry: "1" })
+      )
+    )
   }
 
   return createElement(
@@ -179,8 +185,7 @@ function HomePage() {
                   url,
                   max_pages: maxPages === "" ? null : Number(maxPages),
                   max_depth: maxDepth === "" ? null : Number(maxDepth),
-                  model: model || "default",
-                  debug: debugMode,
+                  model: model || "all",
                 },
               }
               try {
@@ -205,7 +210,7 @@ function HomePage() {
                         [runConfig.id]: [...runs, ...(prev[runConfig.id] || [])],
                       }))
                     }
-                    setExpandedSiteId(runConfig.id)
+                    setExpandedSiteIds((prev) => new Set([...prev, runConfig.id]))
                   }
                 } else {
                   const msg = data.errors?.join?.(" ") || "Failed to add run config"
@@ -295,23 +300,11 @@ function HomePage() {
                   value: model,
                   onChange: (e) => setModel(e.target.value),
                 },
-                createElement("option", { value: "default" }, "Default (All)"),
-                createElement("option", { value: "opus-4.6" }, "Opus 4.6"),
-                createElement("option", { value: "claude-3.5" }, "Claude 3.5"),
-                createElement("option", { value: "gpt-4o" }, "GPT-4o"),
-                createElement("option", { value: "none" }, "None")
+                createElement("option", { value: "all" }, "Default (All)"),
+                createElement("option", { value: "claude-sonnet-4-5" }, "Claude Sonnet 4.5"),
+                createElement("option", { value: "gpt-5.2-mini" }, "GPT-5.2 Mini"),
+                createElement("option", { value: "N/A" }, "None")
               )
-            ),
-            createElement(
-              "label",
-              { className: "prompt-option prompt-box-debug-toggle" },
-              createElement("span", { className: "prompt-option-label" }, "Debug"),
-              createElement("input", {
-                type: "checkbox",
-                checked: debugMode,
-                onChange: (e) => setDebugMode(e.target.checked),
-                "aria-label": "Debug mode",
-              })
             ),
             createElement("button", {
               type: "submit",
@@ -331,9 +324,9 @@ function HomePage() {
                 "ul",
                 { className: "run-configs-list" },
                 ...runConfigs.map((runConfig) => {
-                  const isExpanded = expandedSiteId === runConfig.id
+                  const isExpanded = expandedSiteIds.has(runConfig.id)
                   const runs = runsBySiteId[runConfig.id]
-                  const loadingRuns = loadingRunsForId === runConfig.id
+                  const loadingRuns = loadingRunsForIds.has(runConfig.id)
                   return createElement(
                     "li",
                     { key: runConfig.id, className: "run-configs-list-item" },
@@ -345,24 +338,22 @@ function HomePage() {
                         onClick: () => toggleSiteRuns(runConfig.id),
                       },
                       createElement("span", { className: "run-configs-list-site-expand" }, isExpanded ? "▼" : "▶"),
-                      createElement("a", {
-                        href: runConfig.url,
-                        target: "_blank",
-                        rel: "noopener noreferrer",
-                        className: "run-configs-list-site-url",
-                        onClick: (e) => e.stopPropagation(),
-                      }, runConfig.url),
+                      createElement(
+                        "span",
+                        { className: "run-configs-list-site-url-wrap" },
+                        createElement("a", {
+                          href: runConfig.url,
+                          target: "_blank",
+                          rel: "noopener noreferrer",
+                          className: "run-configs-list-site-url",
+                          onClick: (e) => e.stopPropagation(),
+                        }, runConfig.url),
+                        useUrlIcon(runConfig.url)
+                      ),
                       createElement("span", {
                         className: "run-configs-list-run-config",
                         "aria-label": "Run settings",
-                      }, `${runConfig.max_pages} pages · ${runConfig.max_depth} depth · ${runConfig.model || "Default"}`),
-                      createElement("button", {
-                        type: "button",
-                        className: "run-configs-list-run-btn",
-                        "aria-label": "Start run",
-                        disabled: startingRunForId === runConfig.id,
-                        onClick: (e) => startRun(runConfig.id, e),
-                      }, startingRunForId === runConfig.id ? "…" : "Run")
+                      }, `${runConfig.max_pages} pages · ${runConfig.max_depth} depth · ${runConfig.model || "Default"}`)
                     ),
                     isExpanded &&
                       createElement(
@@ -404,12 +395,22 @@ function HomePage() {
                                         : createElement("span", { className: "run-configs-list-run-duration" }, "—"),
                                       createElement("span", { className: "run-configs-list-run-model" }, run.model || runConfig.model || "—"),
                                       run.status === "completed"
-                                        ? createElement("a", {
-                                            href: `/runs/${run.id}/llms_txt`,
-                                            target: "_blank",
-                                            rel: "noopener noreferrer",
-                                            className: "run-configs-list-run-view-btn",
-                                          }, "View")
+                                        ? createElement(
+                                            "span",
+                                            { className: "run-configs-list-run-action run-configs-list-run-actions" },
+                                            createElement("a", {
+                                              href: `/runs/${run.id}/llms_txt`,
+                                              target: "_blank",
+                                              rel: "noopener noreferrer",
+                                              className: "run-configs-list-run-view-btn",
+                                            }, "View"),
+                                            createElement("a", {
+                                              href: `/runs/${run.id}/debug`,
+                                              target: "_blank",
+                                              rel: "noopener noreferrer",
+                                              className: "run-configs-list-run-view-btn run-configs-list-run-debug-btn",
+                                            }, "Debug")
+                                          )
                                         : run.status === "running"
                                           ? createElement("span", { className: "run-configs-list-run-action", "aria-label": "Running" },
                                               createElement("span", { className: "run-configs-list-run-spinner" }))

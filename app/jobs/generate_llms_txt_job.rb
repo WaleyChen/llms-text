@@ -14,14 +14,12 @@ class GenerateLlmsTxtJob < ApplicationJob
     pages = crawl[:pages] || crawl["pages"] || []
     failed_pages = crawl[:failed_pages] || crawl["failed_pages"] || []
 
-    generator = LlmsTxt::Generator.new(pages, failed_pages, run.model)
-    llms_txt_content = generator.generate
-
-    run.llms_txt = llms_txt_content
+    generator = LlmsTxt::Generator.new(run, pages, failed_pages)
+    run.llms_txt = generator.generate
     run.save
     run.complete
   # TODO: Test This and Write Tests
-  rescue Exception => e
+  rescue StandardError => e
     run&.fail
     raise e
   end

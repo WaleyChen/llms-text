@@ -107,8 +107,9 @@ production:
     password: <%= ENV["LLMS_TEXT_DATABASE_PASSWORD"] %>
     <% end %>
   cache:
-    <<: *primary_production
-    database: llms_text_production_cache
+    <<: *default
+    <% u = ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
+    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
     migrations_paths: db/cache_migrate
   # Use same DB as primary when CABLE_DATABASE_URL / QUEUE_DATABASE_URL not set (e.g. Heroku)
   queue:

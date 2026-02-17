@@ -25,6 +25,9 @@ gem "faraday-retry"
 # HTML/XML parsing
 gem "nokogiri"
 
+# Headless browser for JavaScript-rendered pages
+gem "ferrum"
+
 # LLM integration
 gem "langchainrb"
 gem "ruby-openai" # required by langchainrb for OpenAI

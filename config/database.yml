@@ -96,10 +96,9 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
-# Production URLs come from ENV; passwords are encoded at boot in lib/database_url_encoding.rb
-# so Rails' DATABASE_URL merge and all connections use the same encoded URL.
+# Production: prefer *_ENCODED (set in config/boot.rb) so connections work even if DATABASE_URL is overwritten later.
 production:
-  <% primary_url = ENV["DATABASE_URL"].to_s; cache_url = (ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s; queue_url = (ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s; cable_url = (ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s %>
+  <% primary_url = (ENV["DATABASE_URL_ENCODED"] || ENV["DATABASE_URL"]).to_s; cache_url = (ENV["CACHE_DATABASE_URL_ENCODED"] || ENV["CACHE_DATABASE_URL"]).presence || primary_url; queue_url = (ENV["QUEUE_DATABASE_URL_ENCODED"] || ENV["QUEUE_DATABASE_URL"]).presence || primary_url; cable_url = (ENV["CABLE_DATABASE_URL_ENCODED"] || ENV["CABLE_DATABASE_URL"]).presence || primary_url %>
   primary: &primary_production
     <<: *default
     <% if primary_url.present? %>

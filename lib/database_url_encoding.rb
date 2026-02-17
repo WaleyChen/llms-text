@@ -20,17 +20,26 @@ module DatabaseUrlEncoding
 
   def self.apply_to_env!
     # Use plain Ruby (no ActiveSupport) so this runs when Rake loads app before Rails.
+    # Also set *_ENCODED so database.yml can use them if DATABASE_URL is overwritten later (e.g. by Heroku).
     if (url = ENV["DATABASE_URL"]) && !url.empty?
-      ENV["DATABASE_URL"] = encode_password_in_url(url)
+      encoded = encode_password_in_url(url)
+      ENV["DATABASE_URL"] = encoded
+      ENV["DATABASE_URL_ENCODED"] = encoded
     end
     if (url = ENV["CACHE_DATABASE_URL"]) && !url.empty?
-      ENV["CACHE_DATABASE_URL"] = encode_password_in_url(url)
+      encoded = encode_password_in_url(url)
+      ENV["CACHE_DATABASE_URL"] = encoded
+      ENV["CACHE_DATABASE_URL_ENCODED"] = encoded
     end
     if (url = ENV["QUEUE_DATABASE_URL"]) && !url.empty?
-      ENV["QUEUE_DATABASE_URL"] = encode_password_in_url(url)
+      encoded = encode_password_in_url(url)
+      ENV["QUEUE_DATABASE_URL"] = encoded
+      ENV["QUEUE_DATABASE_URL_ENCODED"] = encoded
     end
     if (url = ENV["CABLE_DATABASE_URL"]) && !url.empty?
-      ENV["CABLE_DATABASE_URL"] = encode_password_in_url(url)
+      encoded = encode_password_in_url(url)
+      ENV["CABLE_DATABASE_URL"] = encoded
+      ENV["CABLE_DATABASE_URL_ENCODED"] = encoded
     end
   end
 end

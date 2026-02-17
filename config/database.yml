@@ -97,8 +97,9 @@ test:
 # for a full overview on how database connection configuration can be specified.
 #
 <%
-  # Rebuild a postgres URL with URL-encoded password so special characters (@, :, /, #, etc.) don't break parsing.
+  # Rebuild a postgres URL with URL-encoded password so special characters don't break parsing.
   # Heroku sets DATABASE_URL and may not allow overriding it; encoding in-app fixes connection errors.
+  # Encode every character not in the unreserved set (A-Za-z0-9\-._~) per RFC 3986.
   def encoded_db_url(raw_url)
     return raw_url if raw_url.to_s.blank?
     return raw_url unless raw_url.include?("://") && raw_url.include?("@")
@@ -107,19 +108,16 @@ test:
     return raw_url if userinfo.blank? || host_part.blank?
     user, password = userinfo.split(":", 2)
     return raw_url if password.nil?
-    enc = password.each_char.map { |c| ":/?#[]@!$&'()*+,;=%".include?(c) ? "%%%02X" % c.ord : c }.join
+    enc = password.each_char.map { |c| c.match?(/\A[A-Za-z0-9\-._~]\z/) ? c : "%%%02X" % c.ord }.join
     "#{scheme}://#{user}:#{enc}@#{host_part}"
   end
-  PRODUCTION_DB_URL = encoded_db_url(ENV["DATABASE_URL"].to_s)
-  PRODUCTION_CACHE_URL = encoded_db_url(ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
-  PRODUCTION_QUEUE_URL = encoded_db_url(ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
-  PRODUCTION_CABLE_URL = encoded_db_url(ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
 %>
 production:
+  <% primary_url = encoded_db_url(ENV["DATABASE_URL"].to_s); cache_url = encoded_db_url(ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s); queue_url = encoded_db_url(ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s); cable_url = encoded_db_url(ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s) %>
   primary: &primary_production
     <<: *default
-    <% if PRODUCTION_DB_URL.present? %>
-    url: <%= PRODUCTION_DB_URL.inspect %>
+    <% if primary_url.present? %>
+    url: <%= primary_url.inspect %>
     <% else %>
     database: llms_text_production
     username: llms_text
@@ -127,14 +125,14 @@ production:
     <% end %>
   cache:
     <<: *default
-    <% if PRODUCTION_CACHE_URL.present? %>url: <%= PRODUCTION_CACHE_URL.inspect %><% end %>
+    <% if cache_url.present? %>url: <%= cache_url.inspect %><% end %>
     migrations_paths: db/cache_migrate
   # Use same DB as primary when CABLE_DATABASE_URL / QUEUE_DATABASE_URL not set (e.g. Heroku)
   queue:
     <<: *default
-    <% if PRODUCTION_QUEUE_URL.present? %>url: <%= PRODUCTION_QUEUE_URL.inspect %><% end %>
+    <% if queue_url.present? %>url: <%= queue_url.inspect %><% end %>
     migrations_paths: db/queue_migrate
   cable:
     <<: *default
-    <% if PRODUCTION_CABLE_URL.present? %>url: <%= PRODUCTION_CABLE_URL.inspect %><% end %>
+    <% if cable_url.present? %>url: <%= cable_url.inspect %><% end %>
     migrations_paths: db/cable_migrate

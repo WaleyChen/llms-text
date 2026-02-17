@@ -34,6 +34,7 @@ class RunConfigsController < ApplicationController
 
     if @run_config.save
       if @run_config.model == Run::MODEL_ALL
+        @runs = []
         Run::MODELS.each do |model|
           @runs << Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: model)
         end

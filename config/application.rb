@@ -1,9 +1,5 @@
 require_relative "boot"
 
-# Encode DB URLs before Rails loads so DATABASE_URL merge and all connections use encoded passwords.
-require_relative "../lib/database_url_encoding"
-DatabaseUrlEncoding.apply_to_env!
-
 require "rails/all"
 
 # Require the gems listed in Gemfile, including any gems

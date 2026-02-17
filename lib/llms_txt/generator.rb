@@ -5,7 +5,6 @@ require "set"
 module LlmsTxt
   class Generator
     def initialize(run, pages, failed_pages)
-      @debug = run.run_config.debug
       @homepage = pages.first
       @pages = pages.drop(1) # drop the homepage from the pages array
       @num_pages_displayed = 0
@@ -45,10 +44,10 @@ module LlmsTxt
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
 
-          if @debug
-            line += " (depth: #{page[:depth]})"
-            line += " (parent_url: #{page[:parent_url]})"
-          end
+          # if @debug
+          #   line += " (depth: #{page[:depth]})"
+          #   line += " (parent_url: #{page[:parent_url]})"
+          # end
           lines << line
         end
         lines << ""
@@ -70,10 +69,10 @@ module LlmsTxt
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
 
-          if @debug
-            line += " (depth: #{page[:depth]})"
-            line += " (parent_url: #{page[:parent_url]})"
-          end
+          # if @debug
+          #   line += " (depth: #{page[:depth]})"
+          #   line += " (parent_url: #{page[:parent_url]})"
+          # end
 
           lines << line
         end
@@ -213,17 +212,17 @@ module LlmsTxt
     # ------------------------------------------------------------
 
     def add_debug_info(lines)
-      if @debug
-        lines << "## Total Pages: #{@pages.size}"
-        lines << "## Total Pages Displayed: #{@num_pages_displayed}"
-        lines << "## Total Failed Pages: #{@failed_pages.size}"
-        lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
-        pages_not_displayed.each do |page|
-          lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
-        end
-        lines << "## Failed Pages"
-        lines << @failed_pages.inspect
-      end
+      # if @debug
+      #   lines << "## Total Pages: #{@pages.size}"
+      #   lines << "## Total Pages Displayed: #{@num_pages_displayed}"
+      #   lines << "## Total Failed Pages: #{@failed_pages.size}"
+      #   lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
+      #   pages_not_displayed.each do |page|
+      #     lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
+      #   end
+      #   lines << "## Failed Pages"
+      #   lines << @failed_pages.inspect
+      # end
     end
 
     def pages_not_displayed

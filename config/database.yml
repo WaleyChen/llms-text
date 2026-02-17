@@ -96,24 +96,10 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
-<%
-  # Rebuild a postgres URL with URL-encoded password so special characters don't break parsing.
-  # Heroku sets DATABASE_URL and may not allow overriding it; encoding in-app fixes connection errors.
-  # Encode every character not in the unreserved set (A-Za-z0-9\-._~) per RFC 3986.
-  def encoded_db_url(raw_url)
-    return raw_url if raw_url.to_s.blank?
-    return raw_url unless raw_url.include?("://") && raw_url.include?("@")
-    scheme, rest = raw_url.split("://", 2)
-    userinfo, host_part = rest.split("@", 2)
-    return raw_url if userinfo.blank? || host_part.blank?
-    user, password = userinfo.split(":", 2)
-    return raw_url if password.nil?
-    enc = password.each_char.map { |c| c.match?(/\A[A-Za-z0-9\-._~]\z/) ? c : "%%%02X" % c.ord }.join
-    "#{scheme}://#{user}:#{enc}@#{host_part}"
-  end
-%>
+# Production URLs come from ENV; passwords are encoded at boot in lib/database_url_encoding.rb
+# so Rails' DATABASE_URL merge and all connections use the same encoded URL.
 production:
-  <% primary_url = encoded_db_url(ENV["DATABASE_URL"].to_s); cache_url = encoded_db_url(ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s); queue_url = encoded_db_url(ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s); cable_url = encoded_db_url(ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s) %>
+  <% primary_url = ENV["DATABASE_URL"].to_s; cache_url = (ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s; queue_url = (ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s; cable_url = (ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"]).to_s %>
   primary: &primary_production
     <<: *default
     <% if primary_url.present? %>

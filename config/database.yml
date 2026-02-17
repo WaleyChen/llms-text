@@ -96,11 +96,30 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
+<%
+  # Rebuild a postgres URL with URL-encoded password so special characters (@, :, /, #, etc.) don't break parsing.
+  # Heroku sets DATABASE_URL and may not allow overriding it; encoding in-app fixes connection errors.
+  def encoded_db_url(raw_url)
+    return raw_url if raw_url.to_s.blank?
+    return raw_url unless raw_url.include?("://") && raw_url.include?("@")
+    scheme, rest = raw_url.split("://", 2)
+    userinfo, host_part = rest.split("@", 2)
+    return raw_url if userinfo.blank? || host_part.blank?
+    user, password = userinfo.split(":", 2)
+    return raw_url if password.nil?
+    enc = password.each_char.map { |c| ":/?#[]@!$&'()*+,;=%".include?(c) ? "%%%02X" % c.ord : c }.join
+    "#{scheme}://#{user}:#{enc}@#{host_part}"
+  end
+  PRODUCTION_DB_URL = encoded_db_url(ENV["DATABASE_URL"].to_s)
+  PRODUCTION_CACHE_URL = encoded_db_url(ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
+  PRODUCTION_QUEUE_URL = encoded_db_url(ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
+  PRODUCTION_CABLE_URL = encoded_db_url(ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"].to_s)
+%>
 production:
   primary: &primary_production
     <<: *default
-    <% if ENV["DATABASE_URL"].to_s != "" %>
-    url: <%= ENV["DATABASE_URL"].to_s.inspect %>
+    <% if PRODUCTION_DB_URL.present? %>
+    url: <%= PRODUCTION_DB_URL.inspect %>
     <% else %>
     database: llms_text_production
     username: llms_text
@@ -108,17 +127,14 @@ production:
     <% end %>
   cache:
     <<: *default
-    <% u = ENV["CACHE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
-    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
+    <% if PRODUCTION_CACHE_URL.present? %>url: <%= PRODUCTION_CACHE_URL.inspect %><% end %>
     migrations_paths: db/cache_migrate
   # Use same DB as primary when CABLE_DATABASE_URL / QUEUE_DATABASE_URL not set (e.g. Heroku)
   queue:
     <<: *default
-    <% u = ENV["QUEUE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
-    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
+    <% if PRODUCTION_QUEUE_URL.present? %>url: <%= PRODUCTION_QUEUE_URL.inspect %><% end %>
     migrations_paths: db/queue_migrate
   cable:
     <<: *default
-    <% u = ENV["CABLE_DATABASE_URL"].presence || ENV["DATABASE_URL"] %>
-    <% if u.present? %>url: <%= u.to_s.inspect %><% end %>
+    <% if PRODUCTION_CABLE_URL.present? %>url: <%= PRODUCTION_CABLE_URL.inspect %><% end %>
     migrations_paths: db/cable_migrate

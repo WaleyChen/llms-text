@@ -9,7 +9,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/<your-user>/llms-text.git
+git clone https://github.com/WaleyChen/llms-text.git
 cd llms-text
 bundle install
 bin/rails db:create

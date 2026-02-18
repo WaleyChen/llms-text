@@ -21,8 +21,13 @@ module LlmsTxt
     end
 
     def crawl
+      debug_lines = []
+
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       crawl_page(@base_url, depth: 0)
-      {pages: @pages, failed_pages: @failed_pages}
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      debug_lines << "Crawl latency: #{elapsed.round(2)} seconds"
+      {pages: @pages, failed_pages: @failed_pages, debug_lines: debug_lines.join("\n")}
     end
 
     private

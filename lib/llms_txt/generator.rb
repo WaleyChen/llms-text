@@ -15,6 +15,7 @@ module LlmsTxt
 
     def generate
       lines = []
+      debug_lines = []
       lines << "# #{@homepage[:title] || 'Untitled'}"
       lines << ""
       lines << "> #{homepage_description}"
@@ -23,11 +24,14 @@ module LlmsTxt
       if @model == Run::MODEL_NONE
         generate_with_no_model(lines)
       else
-        generate_with_model(@model, lines)
+        generate_with_model(@model, lines, debug_lines)
       end
       add_debug_info(lines)
 
-      lines.join("\n")
+      {
+        llms_txt: lines.join("\n"),
+        debug_logs: debug_lines.join("\n")
+      }
     end
 
     private
@@ -80,10 +84,41 @@ module LlmsTxt
       end
     end
 
-    def generate_with_model(model, lines)
+    def generate_with_model(model, lines, debug_lines)
       return generate_with_no_model(lines) unless llm_available?
-      sections = fetch_sections_from_llm
-      render_llm_sections(sections, lines)
+      
+      # Run grouping and title/description generation in parallel
+      all_urls = @pages.map { |p| p[:url].to_s }
+      page_by_url = @pages.index_by { |p| p[:url].to_s }
+      
+      sections_result = nil
+      enriched_urls_map = {}
+      
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      grouping_thread = Thread.new do
+        sections_result = group_urls_into_sections(debug_lines)
+      end
+      
+      enrichment_thread = Thread.new do
+        enriched_urls_map = generate_titles_and_descriptions(all_urls, page_by_url, debug_lines)
+      end
+      
+      grouping_thread.join
+      enrichment_thread.join
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      debug_lines << "Step 3 - Total Latency: #{elapsed.round(2)} seconds"
+      
+      return generate_with_no_model(lines) unless sections_result
+      
+      # Merge grouping with enriched titles/descriptions
+      enriched_sections = {}
+      sections_result.each do |section_name, urls|
+        enriched_sections[section_name] = urls.map do |url|
+          enriched_urls_map[url.to_s] || { "url" => url.to_s }
+        end
+      end
+      
+      render_llm_sections(enriched_sections, lines)
       render_missing_pages(lines)
     end
 
@@ -99,40 +134,144 @@ module LlmsTxt
       @model.to_s.downcase == Run::MODEL_CLAUDE_SONNET_4_5.downcase
     end
 
-    def fetch_sections_from_llm
-      url_list = @pages.map do |p|
+    # Step 1: Group URLs into sections (no title/description generation)
+    def group_urls_into_sections(debug_lines)
+      pages_json = @pages.map do |p|
         title = p[:title] || extract_title_from_url(p[:url])
         desc = p[:description].to_s.strip
-        line = "- #{p[:url]} (title: #{title})"
-        line += " - #{desc.length > 80 ? "#{desc[0..80]}..." : desc}" if desc.present?
-        line
-      end.join("\n")
+        desc = "#{desc[0..80]}..." if desc.length > 80
+        { url: p[:url].to_s, title: title.to_s, description: desc }
+      end
+      pages_payload = JSON.generate(pages_json)
+
+      debug_lines << "Step 1 - URLs passed for grouping: #{JSON.pretty_generate(pages_json)}"
 
       prompt = <<~PROMPT
-        Given these URLs from a website crawl, group them into logical sections for an llms.txt file.
-        For each URL, provide:
-        - title: clean, human-readable (fix casing, remove the product, company or website name from the title if it's present, remove extra words, make it concise)
-        - description: a brief 1-2 sentence description for LLMs (what the page is about, who it's for)
-        Return ONLY valid JSON. No markdown, no explanation.
-        Format: {
-          "Section Name": [
-            {"url": "url1", "title": "Clean Title", "description": "Brief description for LLMs."},
-            {"url": "url2", "title": "Another Title", "description": "..."}
-          ],
-          "Another Section": [
-            {"url": "url3", "title": "Title", "description": "..."}
-          ]
+        Given this JSON array of pages from a website crawl, group them into logical sections for an llms.txt file.
+        Each page includes its existing title and meta description (if any) as context to help you understand what the page is about.
+        
+        Return ONLY valid JSON with this format (URLs only, no titles or descriptions):
+        {
+          "Section Name": ["url1", "url2", "url3"],
+          "Another Section": ["url4", "url5"]
         }
-        Use an "Overview" section for top-level pages (e.g. /about, /pricing).
-        Group related pages (e.g. docs, blog) into their own sections.
-        Order sections by importance (Overview first, then main sections).
-        The sum of the number of urls across all sections must be the same as the number of urls in the input.
+        
+        Rules:
+        - Use an "Overview" section for top-level pages (e.g. /about, /pricing).
+        - Group related pages (e.g. docs, blog) into their own sections.
+        - Order sections by importance (Overview first, then main sections).
+        - The sum of URLs across all sections must equal the number of items in the input array.
+        - Return ONLY the JSON object, no markdown, no explanation.
 
-        URLs:
-        #{url_list}
+        Input (JSON array of pages):
+        #{pages_payload}
       PROMPT
 
-      llm = if claude_model?
+      llm = create_llm_instance
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      response = llm.chat(messages: [{ role: "user", content: prompt }])
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      raw = response.chat_completion.to_s.strip
+      raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
+      json = JSON.parse(raw)
+      debug_lines << "Step 1 - Grouping result: #{JSON.pretty_generate(json)}"
+      debug_lines << "Step 1 - Grouping latency: #{elapsed.round(2)} seconds"
+      json
+    rescue StandardError => e
+      Rails.logger.warn("[Generator] LLM grouping failed: #{e.message}")
+      debug_lines << "Step 1 - Grouping failed: #{e.message}"
+      nil
+    end
+
+
+    # Generate titles and descriptions for URLs
+    def generate_titles_and_descriptions(urls, page_by_url, debug_lines)
+      debug_lines << "Step 2 - Processing #{urls.size} URLs for title/description generation"
+      
+      # Check cache first
+      cached_results = {}
+      urls_to_fetch = []
+      
+      urls.each do |url|
+        cache_key = "llm_enrichment:#{url}"
+        cached = Rails.cache.read(cache_key)
+        if cached
+          cached_results[url.to_s] = cached
+        else
+          urls_to_fetch << url
+        end
+      end
+      
+      debug_lines << "Step 2 - Found #{cached_results.size} cached, fetching #{urls_to_fetch.size} from LLM"
+      
+      # Only call LLM for URLs not in cache
+      if urls_to_fetch.any?
+        pages_data = urls_to_fetch.map do |url|
+          page = page_by_url[url.to_s]
+          next unless page
+
+          {
+            url: url.to_s,
+            existing_title: (page[:title] || extract_title_from_url(url)).to_s,
+            existing_description: page[:description].to_s.strip[0..80]
+          }
+        end.compact
+
+        if pages_data.any?
+          prompt = <<~PROMPT
+            Given this JSON array of page URLs, generate clean titles and LLM-optimized descriptions for each.
+            For each page, provide:
+            - title: clean, human-readable (fix casing, remove the product, company or website name from the title if it's present, remove extra words, make it concise)
+            - description: write a NEW brief 1-2 sentence description optimized for LLMs (what the page is about, who it's for). Do not copy the existing meta description verbatim - rewrite it to be LLM-friendly and informative.
+            
+            Return ONLY valid JSON array. No markdown, no explanation.
+            Format: [
+              {"url": "url1", "title": "Clean Title", "description": "Brief description for LLMs."},
+              {"url": "url2", "title": "Another Title", "description": "..."}
+            ]
+
+            Input (JSON array of pages with existing metadata as context):
+            #{JSON.generate(pages_data)}
+          PROMPT
+
+          llm = create_llm_instance
+          start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          response = llm.chat(messages: [{ role: "user", content: prompt }])
+          elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+          raw = response.chat_completion.to_s.strip
+          raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
+          results = JSON.parse(raw)
+          debug_lines << "Step 2 - Enrichment latency: #{elapsed.round(2)} seconds"
+
+          # Convert array to hash keyed by URL
+          new_results = results.index_by { |item| item["url"].to_s }
+          
+          # Cache each new URL's title/description
+          new_results.each do |url, item|
+            cache_key = "llm_enrichment:#{url}"
+            Rails.cache.write(cache_key, item, expires_in: 30.days)
+          end
+          
+          cached_results.merge!(new_results)
+          new_count = new_results.size
+        else
+          new_count = 0
+        end
+      else
+        new_count = 0
+      end
+      
+      cached_count = cached_results.size - new_count
+      debug_lines << "Step 2 - Enrichment results: #{JSON.pretty_generate(cached_results)}"
+      debug_lines << "Step 2 - Total enrichments: #{cached_results.size} (#{cached_count} cached, #{new_count} new)"
+      cached_results
+    rescue StandardError => e
+      Rails.logger.warn("[Generator] LLM batch enrichment failed: #{e.message}")
+      {}
+    end
+
+    def create_llm_instance
+      if claude_model?
         Langchain::LLM::Anthropic.new(
           api_key: ENV["ANTHROPIC_API_KEY"],
           default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.2, max_tokens: 8192 }
@@ -143,19 +282,6 @@ module LlmsTxt
           default_options: { chat_model: openai_model, temperature: 0.2 }
         )
       end
-
-      if claude_model?
-        puts "Claude model: #{llm.inspect.pretty_inspect}"
-      end
-      
-      response = llm.chat(messages: [{ role: "user", content: prompt }])
-      raw = response.chat_completion.to_s.strip
-      # Strip markdown code blocks if present
-      raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
-      JSON.parse(raw)
-    rescue StandardError => e
-      Rails.logger.warn("[Generator] LLM section identification failed: #{e.message}")
-      nil
     end
 
     def render_llm_sections(sections, lines)
@@ -173,6 +299,7 @@ module LlmsTxt
 
           @num_pages_displayed += 1
           @displayed_urls.add(page[:url])
+
           title = if item.is_a?(Hash) && (item["title"].present? || item[:title].present?)
             (item["title"] || item[:title]).to_s.strip
           else
@@ -186,10 +313,10 @@ module LlmsTxt
           line = "- [#{title}](#{page[:url]})"
           line += ": #{description}" if description.present?
 
-          if Rails.env.development?
-            line += " (depth: #{page[:depth]})"
-            line += " (parent_url: #{page[:parent_url]})"
-          end
+          # if Rails.env.development?
+          #   line += " (depth: #{page[:depth]})"
+          #   line += " (parent_url: #{page[:parent_url]})"
+          # end
           lines << line
         end
         lines << ""
@@ -230,22 +357,21 @@ module LlmsTxt
     end
 
     def homepage_description
-      return generate_description_via_openai if use_ai_description?
+      return generate_description_via_llm if use_ai_description?
       return @homepage[:description] if @homepage[:description].to_s.strip != ""
 
       "No description available."
     end
 
     def use_ai_description?
-      return true if @model.to_s.downcase == Run::MODEL_GPT_5_2_MINI
-      return true if claude_model?
+      return true if @model in Run::LLM_MODELS
       return false if @model.blank?
       return false if @model.to_s.downcase.in?([Run::MODEL_NONE.downcase, "none"])
 
       llm_available?
     end
 
-    def generate_description_via_openai
+    def generate_description_via_llm
       puts "Generating description via LLM for model: #{@model}"
 
       llm = if claude_model?
@@ -336,6 +462,14 @@ module LlmsTxt
         .sort_by { |p| (p[:title] || extract_title_from_url(p[:url])).to_s.downcase } # sort by title, case-insensitive
     end
 
+    # Turns a URL path into a short, human-readable label when there's no real page title
+    # Examples:
+    # https://example.com/about → "About"
+    # https://example.com/docs/guides/getting-started → "Getting Started"
+    # https://example.com/ → "Home"
+    # https://example.com/contact-sales → "Contact Sales"
+    # https://example.com/contact-sales/ → "Contact Sales"
+    # https://example.com/contact-sales/ → "Contact Sales"
     def extract_title_from_url(url)
       uri = URI.parse(url)
       path = uri.path

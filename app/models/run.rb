@@ -17,6 +17,7 @@ class Run < ApplicationRecord
   MODEL_CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
   MODEL_GPT_5_2_MINI = "gpt-5.2-mini"
   MODELS = [MODEL_NONE, MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2_MINI].freeze
+  LLM_MODELS = [MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2_MINI].freeze
 
   validates :status, inclusion: { in: STATUSES }
 
@@ -39,8 +40,8 @@ class Run < ApplicationRecord
   end
 
   private
-
   def broadcast_run_update
+    Rails.logger.info("[Cable] Broadcasting run update: #{id}, status: #{status}")
     RunConfigChannel.broadcast_to(run_config, { run: as_json })
   rescue => e
     Rails.logger.warn("[Cable] broadcast failed: #{e.message}")

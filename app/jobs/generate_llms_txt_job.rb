@@ -15,7 +15,9 @@ class GenerateLlmsTxtJob < ApplicationJob
     failed_pages = crawl[:failed_pages] || crawl["failed_pages"] || []
 
     generator = LlmsTxt::Generator.new(run, pages, failed_pages)
-    run.llms_txt = generator.generate
+    result = generator.generate
+    run.llms_txt = result[:llms_txt]
+    run.debug_logs = result[:debug_logs]
     run.save
     run.complete
   # TODO: Test This and Write Tests

@@ -15,9 +15,9 @@ class Run < ApplicationRecord
   MODEL_ALL        = "all"
   MODEL_NONE       = "N/A"
   MODEL_CLAUDE_SONNET_4_5 = "claude-sonnet-4-5"
-  MODEL_GPT_5_2_MINI = "gpt-5.2-mini"
-  MODELS = [MODEL_NONE, MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2_MINI].freeze
-  LLM_MODELS = [MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2_MINI].freeze
+  MODEL_GPT_5_2 = "gpt-5.2"
+  MODELS = [MODEL_NONE, MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2].freeze
+  LLM_MODELS = [MODEL_CLAUDE_SONNET_4_5, MODEL_GPT_5_2].freeze
 
   validates :status, inclusion: { in: STATUSES }
 

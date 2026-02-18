@@ -16,17 +16,9 @@ module LlmsTxt
     def generate
       lines = []
       debug_lines = []
-      lines << "# #{@homepage[:title] || 'Untitled'}"
-      lines << ""
-      lines << "> #{homepage_description}"
-      lines << ""
-
-      if @model == Run::MODEL_NONE
-        generate_with_no_model(lines)
-      else
-        generate_with_model(@model, lines, debug_lines)
-      end
-      add_debug_info(lines)
+      generate_top_section(lines)
+      generate_url_sections(lines, debug_lines)
+      add_debug_info(debug_lines)
 
       {
         llms_txt: lines.join("\n"),
@@ -35,6 +27,21 @@ module LlmsTxt
     end
 
     private
+
+    def generate_top_section(lines)
+      lines << "# #{@homepage[:title] || 'Untitled'}"
+      lines << ""
+      lines << "> #{homepage_description}"
+      lines << ""
+    end
+
+    def generate_url_sections(lines, debug_lines)
+      if @model == Run::MODEL_NONE
+        generate_with_no_model(lines)
+      else
+        generate_with_model(@model, lines, debug_lines)
+      end
+    end
 
     def generate_with_no_model(lines)
       overview_pages = pages_for_overview
@@ -84,9 +91,7 @@ module LlmsTxt
       end
     end
 
-    def generate_with_model(model, lines, debug_lines)
-      return generate_with_no_model(lines) unless llm_available?
-      
+    def generate_with_model(model, lines, debug_lines)      
       # Run grouping and title/description generation in parallel
       all_urls = @pages.map { |p| p[:url].to_s }
       page_by_url = @pages.index_by { |p| p[:url].to_s }
@@ -122,18 +127,6 @@ module LlmsTxt
       render_missing_pages(lines)
     end
 
-    def llm_available?
-      if claude_model?
-        ENV["ANTHROPIC_API_KEY"].present?
-      else
-        ENV["OPENAI_API_KEY"].present?
-      end
-    end
-
-    def claude_model?
-      @model.to_s.downcase == Run::MODEL_CLAUDE_SONNET_4_5.downcase
-    end
-
     # Step 1: Group URLs into sections (no title/description generation)
     def group_urls_into_sections(debug_lines)
       pages_json = @pages.map do |p|
@@ -158,6 +151,7 @@ module LlmsTxt
         
         Rules:
         - Use an "Overview" section for top-level pages (e.g. /about, /pricing).
+        - Use an "Localized Pages" section for pages that are localized to a specific language.
         - Group related pages (e.g. docs, blog) into their own sections.
         - Order sections by importance (Overview first, then main sections).
         - The sum of URLs across all sections must equal the number of items in the input array.
@@ -193,7 +187,7 @@ module LlmsTxt
       urls_to_fetch = []
       
       urls.each do |url|
-        cache_key = "llm_enrichment:#{url}"
+        cache_key = "#{@model}:#{url}"
         cached = Rails.cache.read(cache_key)
         if cached
           cached_results[url.to_s] = cached
@@ -248,7 +242,7 @@ module LlmsTxt
           
           # Cache each new URL's title/description
           new_results.each do |url, item|
-            cache_key = "llm_enrichment:#{url}"
+            cache_key = "#{@model}:#{url}"
             Rails.cache.write(cache_key, item, expires_in: 30.days)
           end
           
@@ -271,16 +265,18 @@ module LlmsTxt
     end
 
     def create_llm_instance
-      if claude_model?
+      if @model.to_s == Run::MODEL_CLAUDE_SONNET_4_5
         Langchain::LLM::Anthropic.new(
           api_key: ENV["ANTHROPIC_API_KEY"],
           default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.2, max_tokens: 8192 }
         )
-      else
+      elsif @model.to_s == Run::MODEL_GPT_5_2
         Langchain::LLM::OpenAI.new(
           api_key: ENV["OPENAI_API_KEY"],
-          default_options: { chat_model: openai_model, temperature: 0.2 }
+          default_options: { chat_model: Run::MODEL_GPT_5_2, temperature: 0.2 }
         )
+      else
+        raise "Invalid model: #{@model}"
       end
     end
 
@@ -339,17 +335,15 @@ module LlmsTxt
     # ------------------------------------------------------------
 
     def add_debug_info(lines)
-      # if @debug
-      #   lines << "## Total Pages: #{@pages.size}"
-      #   lines << "## Total Pages Displayed: #{@num_pages_displayed}"
-      #   lines << "## Total Failed Pages: #{@failed_pages.size}"
-      #   lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
-      #   pages_not_displayed.each do |page|
-      #     lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
-      #   end
-      #   lines << "## Failed Pages"
-      #   lines << @failed_pages.inspect
-      # end
+      lines << "## Total Pages: #{@pages.size}"
+      lines << "## Total Pages Displayed: #{@num_pages_displayed}"
+      lines << "## Total Failed Pages: #{@failed_pages.size}"
+      lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
+      pages_not_displayed.each do |page|
+        lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
+      end
+      lines << "## Failed Pages"
+      lines << @failed_pages.inspect
     end
 
     def pages_not_displayed
@@ -357,34 +351,16 @@ module LlmsTxt
     end
 
     def homepage_description
-      return generate_description_via_llm if use_ai_description?
+      return generate_description_via_llm if Run::LLM_MODELS.include?(@model)
       return @homepage[:description] if @homepage[:description].to_s.strip != ""
 
       "No description available."
     end
 
-    def use_ai_description?
-      return true if @model in Run::LLM_MODELS
-      return false if @model.blank?
-      return false if @model.to_s.downcase.in?([Run::MODEL_NONE.downcase, "none"])
-
-      llm_available?
-    end
-
     def generate_description_via_llm
       puts "Generating description via LLM for model: #{@model}"
 
-      llm = if claude_model?
-        Langchain::LLM::Anthropic.new(
-          api_key: ENV["ANTHROPIC_API_KEY"],
-          default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.3, max_tokens: 512 }
-        )
-      else
-        Langchain::LLM::OpenAI.new(
-          api_key: ENV["OPENAI_API_KEY"],
-          default_options: { chat_model: openai_model, temperature: 0.3 }
-        )
-      end
+      llm = create_llm_instance
       content = build_description_context
       prompt = <<~PROMPT
         Write a brief 2-4 sentence description for this website's llms.txt file.
@@ -399,15 +375,6 @@ module LlmsTxt
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM description failed: #{e.message}")
       "No description available."
-    end
-
-    def openai_model
-      case @model.to_s.downcase
-      when "gpt-4o" then "gpt-4o"
-      when "gpt-5.2-mini" then "gpt-4o-mini"
-      when "opus-4.6", "claude-3.5" then "gpt-4o" # map non-OpenAI to gpt-4o
-      else "gpt-4o"
-      end
     end
 
     def build_description_context
@@ -481,27 +448,3 @@ module LlmsTxt
     end
   end
 end
-
-# Here are focused suggestions for improving your llms.txt generation:
-# 1. Section order
-# first_path_segments keeps the order of first occurrence in @pages, so section order is effectively crawl order. For predictable output, sort segments (e.g. alphabetically) or define a priority list (e.g. put "docs" before "blog") and use that when iterating.
-# 2. Page order within sections
-# pages_for_first_segment keeps crawl order. Consider sorting by title, URL, or depth (e.g. shallow first) so the same run always produces the same ordering and important pages are easier to find.
-# 3. Homepage / root in sections
-# For https://example.com/ or path "/", first_segment_for_url returns nil (path has no segments), so the homepage never appears under any ## section—only in the header. If you want it listed in the body too, treat nil (or path "/") as a segment like "Home" or "Overview" and add a section for it.
-# 4. Segment display names
-# segment.capitalize gives "Contact-sales" for contact-sales. For nicer headings, humanize: replace -/_ with spaces and title-case (e.g. "Contact Sales").
-# 5. Markdown safety
-# If page[:title] or page[:description] contains ], (, or backticks, the list item can break. Escaping or stripping those characters (or wrapping in backticks where appropriate) keeps the output valid markdown.
-# 6. Optional structure
-# Table of contents: at the top, list each ## Segment as a link to an anchor (e.g. ## Blog → #blog) so the file is easier to navigate.
-# Stable anchors: use a consistent slug (e.g. downcased segment, spaces → -) for ## headings so TOC links work.
-# 7. Optional metadata
-# If you have crawl time or run id, a short line like “Generated …” or “Last crawled …” at the top or bottom can help without changing the main structure.
-# 8. Long descriptions
-# If descriptions are long, truncate (e.g. first sentence or N characters) so the file stays scannable and link-heavy.
-# 9. Empty / missing description
-# You already use page[:description].to_s.strip != "". You could show a fallback (e.g. “No description”) only in dev, or leave it out in production so the line stays minimal.
-# 10. Second-level grouping (optional)
-# If you have deep trees (e.g. /docs/guides, /docs/api), you could group by first two path segments (e.g. “Docs > Guides”, “Docs > Api”) for subsections. That adds complexity; only worth it if the sites you crawl are highly structured.
-# Most impact for minimal change: stable section order, stable page order within sections, and handling the root path so the homepage can appear in a section if you want it. Next: humanized segment names and markdown-safe titles/descriptions.

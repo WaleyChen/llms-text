@@ -302,7 +302,7 @@ function HomePage() {
                 },
                 createElement("option", { value: "all" }, "Default (All)"),
                 createElement("option", { value: "claude-sonnet-4-5" }, "Claude Sonnet 4.5"),
-                createElement("option", { value: "gpt-5.2-mini" }, "GPT-5.2 Mini"),
+                createElement("option", { value: "gpt-5.2" }, "GPT-5.2"),
                 createElement("option", { value: "N/A" }, "None")
               )
             ),

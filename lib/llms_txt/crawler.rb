@@ -6,7 +6,7 @@ module LlmsTxt
   class Crawler
     DEFAULT_MAX_PAGES = 20
     DEFAULT_MAX_DEPTH = 3
-    CONCURRENCY = 4 #TODOS: Set to 1 when already cached, otherwise 4
+    CONCURRENCY = 4
 
     def initialize(base_url, max_pages: nil, max_depth: nil)
       @base_url = normalize_url(base_url)
@@ -99,7 +99,6 @@ module LlmsTxt
       end
 
       if Rails.env.development?
-        # puts "doc: #{doc.inspect}"
         puts "links_to_follow: #{links_to_follow.inspect}"
       end
 

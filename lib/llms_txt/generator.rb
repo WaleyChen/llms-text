@@ -296,11 +296,6 @@ module LlmsTxt
           end
           line = "- [#{title}](#{page[:url]})"
           line += ": #{description}" if description.present?
-
-          # if Rails.env.development?
-          #   line += " (depth: #{page[:depth]})"
-          #   line += " (parent_url: #{page[:parent_url]})"
-          # end
           lines << line
         end
         lines << ""

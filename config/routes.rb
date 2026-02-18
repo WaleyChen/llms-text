@@ -1,7 +1,6 @@
 Rails.application.routes.draw do
   mount ActionCable.server => "/cable"
 
-  resources :site_monitors
   resources :runs, only: %i[index show] do
     member do
       get :llms_txt

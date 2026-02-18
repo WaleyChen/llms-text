@@ -1,6 +1,5 @@
 class Run < ApplicationRecord
   belongs_to :run_config
-  has_one :site_monitor
   validates :run_config_id, presence: true
 
   after_create_commit :broadcast_run_update

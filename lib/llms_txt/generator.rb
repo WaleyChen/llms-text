@@ -53,11 +53,6 @@ module LlmsTxt
           title = page[:title] || extract_title_from_url(page[:url])
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
-
-          # if @debug
-          #   line += " (depth: #{page[:depth]})"
-          #   line += " (parent_url: #{page[:parent_url]})"
-          # end
           lines << line
         end
         lines << ""
@@ -78,12 +73,6 @@ module LlmsTxt
           title = page[:title] || extract_title_from_url(page[:url])
           line = "- [#{title}](#{page[:url]})"
           line += ": #{page[:description]}" if page[:description].to_s.strip != ""
-
-          # if @debug
-          #   line += " (depth: #{page[:depth]})"
-          #   line += " (parent_url: #{page[:parent_url]})"
-          # end
-
           lines << line
         end
         lines << ""
@@ -352,12 +341,13 @@ module LlmsTxt
     def homepage_description
       return generate_description_via_llm if Run::LLM_MODELS.include?(@model)
       return @homepage[:description] if @homepage[:description].to_s.strip != ""
-
       "No description available."
     end
 
     def generate_description_via_llm
-      puts "Generating description via LLM for model: #{@model}"
+      cache_key = "#{@model}:description:#{@homepage[:url]}"
+      cached = Rails.cache.read(cache_key)
+      return cached if cached
 
       llm = create_llm_instance
       content = build_description_context
@@ -370,7 +360,9 @@ module LlmsTxt
         #{content}
       PROMPT
       response = llm.chat(messages: [{ role: "user", content: prompt }])
-      response.chat_completion.to_s.strip.presence || "No description available."
+      result = response.chat_completion.to_s.strip.presence || "No description available."
+      Rails.cache.write(cache_key, result, expires_in: 30.days)
+      result
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM description failed: #{e.message}")
       "No description available."

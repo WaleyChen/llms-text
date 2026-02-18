@@ -1,2 +1,0 @@
-class SiteMonitorsController < ApplicationController
-end

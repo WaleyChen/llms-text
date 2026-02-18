@@ -19,6 +19,16 @@ bin/dev
 
 The app will be available at `http://localhost:3000`.
 
+### Setting API keys
+
+To enable LLM-powered generation:
+1. Get an API key from https://platform.claude.com/settings/keys and https://platform.openai.com/api-keys.
+2. Export the keys to your shell:
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+```
+
 ### Environment variables
 
 LLM-powered generation is optional. Without API keys, the app falls back to a URL-based grouping algorithm.

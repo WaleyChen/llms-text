@@ -16,9 +16,9 @@ class RunConfigsController < ApplicationController
   def create
     request.format = :json if request.headers["Accept"]&.include?("application/json")
     
-    # Handle attributes
+    # Handle/Validate/Normalize attributes
     attrs = run_config_params.to_h
-    url, error = validate_and_resolve_url(attrs[:url])
+    url, error = validate_url(attrs[:url])
     if error
       return render_error(error)
     end
@@ -74,28 +74,37 @@ class RunConfigsController < ApplicationController
     IPAddr.new("::1/128"),
   ].freeze
 
-  # Returns [resolved_url, nil] on success or [nil, error_message] on failure.
-  def validate_and_resolve_url(raw)
+  # Validates the URL and returns the normalized URL or an error message
+  # Validates the URL by:
+  # - Rejecting blank URLs
+  # - Rejecting URLs that do not contain a valid domain (e.g. example.com)
+  # - Rejecting non-http/https protocols like ftp://, mailto://, etc.
+  # - Rejecting URLs that are not valid (e.g. the URL is not a valid URL)
+  # - Rejecting URLs pointing to private or local networks (e.g. 127.0.0.1, localhost, etc.)
+  # - Rejecting URLs that are not reachable (e.g. the URL is not responding to requests)
+  def validate_url(raw)
     url = raw.to_s.strip
 
     return [nil, "URL can't be blank."] if url.blank?
     return [nil, "URL must contain a valid domain (e.g. example.com)."] unless url.include?(".")
 
-    if url.match?(%r{\A\w+://}i) && !url.match?(%r{\Ahttps?://}i)
-      return [nil, "Only http and https URLs are supported."]
-    end
-
-    # Parse the URL and check if it's valid
-    test_url = url.match?(%r{\Ahttps?://}i) ? url : "https://#{url}"
-    uri = URI.parse(test_url)
+    # Validate the URL is a valid URL by parsing it with URI.parse
+    url = "https://#{url}" unless url.match?(%r{\A\w+://}i) # Prepend https if no scheme
+    return [nil, "Only http and https URLs are supported."] unless url.match?(%r{\Ahttps?://}i) # Reject non-http/https protocols
+    uri = URI.parse(url)
     return [nil, "URL is not valid."] unless uri.host.present?
 
+    uri.query = nil # Remove query parameters
+    uri.fragment = nil # Remove fragment, the part after the # symbol
+    url = uri.to_s
+
+    # Rejects URLs pointing to private or local networks (e.g. 127.0.0.1, localhost, etc.)
     ip = Resolv.getaddress(uri.host)
     if PRIVATE_IP_RANGES.any? { |range| range.include?(ip) }
       return [nil, "URLs pointing to private or local networks are not allowed."]
     end
 
-    # Search https and http versions of the URL
+    # Try to connect to the URL (https or http)
     candidates = url.match?(%r{\Ahttps?://}i) ? [url] : ["https://#{url}", "http://#{url}"]
     candidates.each do |candidate|
       return [candidate, nil] if reachable?(candidate)
@@ -108,6 +117,7 @@ class RunConfigsController < ApplicationController
     [nil, "Could not resolve hostname. Please check the URL."]
   end
 
+  # Checks if the URL is reachable by trying to connect to it with a HEAD request
   def reachable?(url)
     conn = Faraday.new do |f|
       f.response :follow_redirects, limit: 3

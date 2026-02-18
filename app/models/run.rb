@@ -38,7 +38,6 @@ class Run < ApplicationRecord
     self.save!
   end
 
-  private
   def broadcast_run_update
     Rails.logger.info("[Cable] Broadcasting run update: #{id}, status: #{status}")
     RunConfigChannel.broadcast_to(run_config, { run: as_json })

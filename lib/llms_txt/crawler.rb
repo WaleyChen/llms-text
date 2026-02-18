@@ -8,8 +8,11 @@ module LlmsTxt
     DEFAULT_MAX_DEPTH = 3
     CONCURRENCY = 4
 
+    AUTH_STATUSES = [401, 403].freeze
+    CRAWL_CACHE_EXPIRY = 1.day
+
     def initialize(base_url, max_pages: nil, max_depth: nil)
-      @base_url = normalize_url(base_url)
+      @base_url = base_url
       @base_uri = URI.parse(@base_url)
       @scheme = @base_uri.scheme
       @max_pages = (max_pages + 1) || DEFAULT_MAX_PAGES # +1 because we exclude the homepage from llms.txt
@@ -21,16 +24,48 @@ module LlmsTxt
     end
 
     def crawl
+      cache_key = self.class.crawl_cache_key(@base_url, @max_pages, @max_depth)
+      cached = Rails.cache.read(cache_key)
+      if cached
+        Rails.logger.info("[Crawler] Cache hit for #{cache_key}")
+        return cached
+      end
+
       debug_lines = []
 
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       crawl_page(@base_url, depth: 0)
       elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-      debug_lines << "Crawl latency: #{elapsed.round(2)} seconds"
-      {pages: @pages, failed_pages: @failed_pages, debug_lines: debug_lines.join("\n")}
+      debug_lines << "Crawl Latency: #{elapsed.round(2)} seconds"
+
+      # Fail if any pages returned errors except when all failed pages are authentication errors
+      error = if @pages.empty? && @failed_pages.present? && !all_auth_errors?
+        "Crawl failed: all pages returned errors."
+      end
+
+      result = {pages: @pages, failed_pages: @failed_pages, error: error, debug_lines: debug_lines.join("\n")}
+
+      Rails.cache.write(cache_key, result, expires_in: CRAWL_CACHE_EXPIRY) unless error
+      result
+    end
+
+    # Returns the cache key for a crawl result
+    def self.crawl_cache_key(url, max_pages, max_depth)
+      "crawl:#{url}:#{max_pages}:#{max_depth}"
+    end
+
+    # Returns the cache key for a crawl result for a run
+    def self.run_crawl_cache_key(run)
+      crawl_cache_key(run.run_config.url, run.run_config.max_pages + 1, run.run_config.max_depth) # +1 because we exclude the homepage from llms.txt
     end
 
     private
+
+    def all_auth_errors?
+      @failed_pages.all? do |fp|
+        AUTH_STATUSES.include?(fp[:status]) || fp[:error].to_s.match?(/auth|unauthorized|forbidden/i)
+      end
+    end
 
     # Normalize a URL by:
     # - Stripping whitespace
@@ -72,7 +107,8 @@ module LlmsTxt
         if status >= 200 && status < 300
           body = response.body
         else
-          Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{response.status}")
+          @failed_pages << {url: url, status: status}
+          Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{status}")
           return
         end
       rescue StandardError => e

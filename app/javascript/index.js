@@ -82,6 +82,20 @@ function HomePage() {
             },
           }
         )
+        setTimeout(() => { // Re-fetch runs to catch any missed broadcasts during subscription handshake
+          fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data) => {
+              const fresh = Array.isArray(data) ? data : []
+              setRunsBySiteId((prev) => {
+                const existing = prev[siteId] || []
+                const merged = [...fresh]
+                existing.forEach((r) => { if (!merged.find((m) => m.id === r.id)) merged.push(r) })
+                return { ...prev, [siteId]: merged }
+              })
+            })
+            .catch(() => {})
+        }, 200)
       } catch (e) {
         console.warn("[Cable] subscribe failed for", siteId, e)
       }

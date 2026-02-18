@@ -29,16 +29,12 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-### Environment variables
-
-LLM-powered generation is optional. Without API keys, the app falls back to a URL-based grouping algorithm.
-
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | No | Enables GPT-powered section grouping and descriptions |
-| `ANTHROPIC_API_KEY` | No | Enables Claude-powered section grouping and descriptions |
-| `DATABASE_URL` | Production only | PostgreSQL connection string |
-| `RAILS_MASTER_KEY` | Production only | Decrypts `config/credentials.yml.enc` |
-| `ACTION_CABLE_ORIGIN` | Production only | Allowed WebSocket origin for real-time updates |
-
-Set these in your shell or in a `.env` file (the app does not load `.env` automatically; use `export` or a tool like [direnv](https://direnv.net/)).
+## Deployment
+1. Finish Setup instructions.
+2. Sign up for Heroku: https://signup.heroku.com/
+3. Create a Heroku app: https://devcenter.heroku.com/articles/getting-started-with-rails8#create-a-heroku-app
+4. Setup LLM API keys: https://devcenter.heroku.com/articles/config-vars#using-the-heroku-dashboard
+4. Provision a Database: https://devcenter.heroku.com/articles/getting-started-with-rails8#provision-a-database
+5. Deploy the App to Heroku: https://devcenter.heroku.com/articles/getting-started-with-rails8#deploy-the-app-to-heroku
+6. Migrate the Database: https://devcenter.heroku.com/articles/getting-started-with-rails8#migrate-the-database
+7. Scale and Access the Application: https://devcenter.heroku.com/articles/getting-started-with-rails8#scale-and-access-the-application

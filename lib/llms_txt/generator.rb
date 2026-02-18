@@ -19,7 +19,6 @@ module LlmsTxt
       generate_top_section(lines)
       generate_url_sections(lines, debug_lines)
       add_debug_info(debug_lines)
-
       {
         llms_txt: lines.join("\n"),
         debug_logs: debug_lines.join("\n")

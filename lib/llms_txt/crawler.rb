@@ -12,7 +12,7 @@ module LlmsTxt
       @base_url = normalize_url(base_url)
       @base_uri = URI.parse(@base_url)
       @scheme = @base_uri.scheme
-      @max_pages = max_pages || DEFAULT_MAX_PAGES
+      @max_pages = (max_pages + 1) || DEFAULT_MAX_PAGES # +1 because we exclude the homepage from llms.txt
       @max_depth = max_depth || DEFAULT_MAX_DEPTH
       @visited = Set.new
       @pages = []
@@ -61,7 +61,7 @@ module LlmsTxt
       url = normalize_url(url)
       visited_key = visited_key(url)
       @mutex.synchronize do
-        return if depth > @max_depth || @visited.include?(visited_key) || @pages.size - 1 >= @max_pages # -1 because we exclude the homepage from llms.txt
+        return if depth > @max_depth || @visited.include?(visited_key) || @pages.size >= @max_pages
         @visited.add(visited_key)
       end
 
@@ -91,6 +91,7 @@ module LlmsTxt
 
       links_to_follow = nil
       @mutex.synchronize do
+        return if @pages.size >= @max_pages
         @pages << page_data
         if depth < @max_depth && @pages.size < @max_pages
           links_to_follow = collect_follow_links(doc, url, depth + 1)

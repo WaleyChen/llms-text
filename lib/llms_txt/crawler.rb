@@ -67,22 +67,6 @@ module LlmsTxt
       end
     end
 
-    # Normalize a URL by:
-    # - Stripping whitespace
-    # - Prepending the scheme if no scheme
-    # - Removing query parameters and fragment
-    # - Returning the normalized URL
-    def normalize_url(url)
-      url = url.to_s.strip
-      url = "#{@scheme}://#{url}" unless url.match?(%r{\Ahttps?://}i) # prepend scheme if no scheme
-      uri = URI.parse(url)
-      uri.query = nil # remove query parameters
-      uri.fragment = nil # remove fragment, the part after the # symbol
-      uri.to_s
-    rescue URI::InvalidURIError
-      url
-    end
-
     # Scheme-agnostic key so http and https versions of the same page count as one visit.
     def visited_key(url)
       uri = URI.parse(url)
@@ -95,6 +79,8 @@ module LlmsTxt
     def crawl_page(url, parent_url: nil, depth: 0)
       url = normalize_url(url)
       visited_key = visited_key(url)
+      
+      # Protect the visited set and pages array from concurrent access
       @mutex.synchronize do
         return if depth > @max_depth || @visited.include?(visited_key) || @pages.size >= @max_pages
         @visited.add(visited_key)
@@ -198,6 +184,22 @@ module LlmsTxt
       text = element.text
       # Normalize whitespace
       text.gsub(/\s+/, " ").strip
+    end
+
+    # Normalize a URL by:
+    # - Stripping whitespace
+    # - Prepending the scheme if no scheme
+    # - Removing query parameters and fragment
+    # - Returning the normalized URL
+    def normalize_url(url)
+      url = url.to_s.strip
+      url = "#{@scheme}://#{url}" unless url.match?(%r{\Ahttps?://}i) # prepend scheme if no scheme
+      uri = URI.parse(url)
+      uri.query = nil # remove query parameters
+      uri.fragment = nil # remove fragment, the part after the # symbol
+      uri.to_s
+    rescue URI::InvalidURIError
+      url
     end
   end
 end

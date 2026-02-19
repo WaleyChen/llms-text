@@ -20,7 +20,7 @@ function HomePage() {
     })
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
-        const list = Array.isArray(data) ? data : []
+        const list = (Array.isArray(data) ? data : []).filter((rc) => rc && rc.id != null)
         setRunConfigs(list)
         if (list.length > 0) setExpandedSiteIds((prev) => new Set([...prev, list[0].id]))
       })
@@ -36,7 +36,8 @@ function HomePage() {
       fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
-          setRunsBySiteId((prev) => ({ ...prev, [siteId]: Array.isArray(data) ? data : [] }))
+          const list = Array.isArray(data) ? data.filter((r) => r && r.id != null) : []
+          setRunsBySiteId((prev) => ({ ...prev, [siteId]: list }))
         })
         .catch(() => setRunsBySiteId((prev) => ({ ...prev, [siteId]: [] })))
         .finally(() => setLoadingRunsForIds((prev) => {
@@ -77,7 +78,7 @@ function HomePage() {
               const runConfigId = run.run_config_id
               const terminal = (s) => s === "completed" || s === "failed"
               setRunsBySiteId((prev) => {
-                const list = prev[runConfigId] || []
+                const list = (prev[runConfigId] || []).filter((r) => r && r.id != null)
                 const idx = list.findIndex((r) => r.id === run.id)
                 const existing = idx >= 0 ? list[idx] : null
                 const use = existing && terminal(existing.status) && !terminal(run.status) ? existing : run
@@ -92,11 +93,11 @@ function HomePage() {
             fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
               .then((res) => (res.ok ? res.json() : []))
               .then((data) => {
-                const fresh = Array.isArray(data) ? data : []
+                const fresh = (Array.isArray(data) ? data : []).filter((r) => r && r.id != null)
                 setRunsBySiteId((prev) => {
-                  const existing = prev[siteId] || []
+                  const existing = (prev[siteId] || []).filter((r) => r && r.id != null)
                   const merged = [...fresh]
-                  existing.forEach((r) => { if (!merged.find((m) => m.id === r.id)) merged.push(r) })
+                  existing.forEach((r) => { if (!merged.find((m) => m && m.id === r.id)) merged.push(r) })
                   return { ...prev, [siteId]: merged }
                 })
               })
@@ -222,13 +223,13 @@ function HomePage() {
                 const data = await res.json().catch(() => ({}))
                 if (res.ok) {
                   const runConfig = data.run_config
-                  const runs = data.runs || (data.run ? [data.run] : [])
-                  if (runConfig) {
+                  const runs = (data.runs || (data.run ? [data.run] : [])).filter((r) => r && r.id != null)
+                  if (runConfig && runConfig.id != null) {
                     setRunConfigs((prev) => [runConfig, ...prev])
                     if (runs.length > 0) {
                       setRunsBySiteId((prev) => ({
                         ...prev,
-                        [runConfig.id]: [...runs, ...(prev[runConfig.id] || [])],
+                        [runConfig.id]: [...runs, ...(prev[runConfig.id] || []).filter((r) => r && r.id != null)],
                       }))
                     }
                     setExpandedSiteIds((prev) => new Set([...prev, runConfig.id]))
@@ -355,9 +356,9 @@ function HomePage() {
             : createElement(
                 "ul",
                 { className: "run-configs-list" },
-                ...runConfigs.map((runConfig) => {
+                ...runConfigs.filter((rc) => rc && rc.id != null).map((runConfig) => {
                   const isExpanded = expandedSiteIds.has(runConfig.id)
-                  const runs = runsBySiteId[runConfig.id]
+                  const runs = (runsBySiteId[runConfig.id] || []).filter((r) => r && r.id != null)
                   const loadingRuns = loadingRunsForIds.has(runConfig.id)
                   return createElement(
                     "li",

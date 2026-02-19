@@ -9,9 +9,11 @@ class CrawlJob < ApplicationJob
     crawler = LlmsTxt::Crawler.new(
       url,
       max_pages: run_config.max_pages,
-      max_depth: run_config.max_depth
+      max_depth: run_config.max_depth,
+      run_config: run_config
     )
     result = crawler.crawl
+    Rails.logger.info("[CrawlJob] Result: #{result.inspect.pretty_inspect}")
 
     if result[:error]
       ActiveRecord::Base.transaction do

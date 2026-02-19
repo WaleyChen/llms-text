@@ -37,6 +37,15 @@ class RunConfig < ApplicationRecord
     broadcast_run_config_update
   end
 
+  def append_debug_logs(lines)
+    return if lines.blank?
+
+    self.debug_logs ||= ""
+    self.debug_logs += (lines.is_a?(String) ? [lines] : Array(lines)).join("\n")
+    self.debug_logs += "\n" unless self.debug_logs.end_with?("\n")
+    save!
+  end
+
   # Broadcasts the run config update to the client
   def broadcast_run_config_update
     Rails.logger.info("[Cable] Broadcasting run config update: #{id}, status: #{status}")

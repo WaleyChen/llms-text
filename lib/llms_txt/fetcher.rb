@@ -65,7 +65,7 @@ module LlmsTxt
       end
 
       def get(url)
-        cache_key = url
+        cache_key = url_cache_key(url)
         cached = Rails.cache.read(cache_key)
         return response_with_body(cached) if cached
 
@@ -78,11 +78,11 @@ module LlmsTxt
         body = response.body.to_s
 
         # If JS-rendered, refetch with headless browser for full content
-        if response.success? && html_response?(response) && javascript_rendered?(body)
-          puts "JavaScript-rendered page detected for #{url}, fetching with headless browser"
-          ferrum_body = fetch_with_ferrum(url)
-          body = ferrum_body if ferrum_body.present?
-        end
+        # if response.success? && html_response?(response) && javascript_rendered?(body)
+        #   puts "JavaScript-rendered page detected for #{url}, fetching with headless browser"
+        #   ferrum_body = fetch_with_ferrum(url)
+        #   body = ferrum_body if ferrum_body.present?
+        # end
 
         if response.success?
           Rails.cache.write(cache_key, body, expires_in: CACHE_EXPIRY)
@@ -94,6 +94,20 @@ module LlmsTxt
       end
 
       private
+
+      # Normalize URL for cache so /path and /path/ share the same entry
+      def url_cache_key(url)
+        uri = URI.parse(url.to_s)
+        path = uri.path.to_s
+        path = path.end_with?("/") && path != "/" ? path[0..-2] : path
+        path = "/" if path.empty?
+        uri.path = path
+        uri.query = nil
+        uri.fragment = nil
+        uri.to_s
+      rescue URI::InvalidURIError
+        url.to_s
+      end
 
       def html_response?(response)
         content_type = response.headers["content-type"].to_s.downcase

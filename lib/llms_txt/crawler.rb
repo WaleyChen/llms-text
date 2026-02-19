@@ -11,7 +11,7 @@ module LlmsTxt
     AUTH_STATUSES = [401, 403].freeze
     CRAWL_CACHE_EXPIRY = 1.day
 
-    def initialize(base_url, max_pages: nil, max_depth: nil)
+    def initialize(base_url, max_pages:, max_depth:, run_config:)
       @base_url = base_url
       @base_uri = URI.parse(@base_url)
       @scheme = @base_uri.scheme
@@ -21,6 +21,7 @@ module LlmsTxt
       @pages = []
       @failed_pages = []
       @mutex = Mutex.new
+      @run_config = run_config
     end
 
     def crawl
@@ -28,6 +29,7 @@ module LlmsTxt
       cached = Rails.cache.read(cache_key)
       if cached
         Rails.logger.info("[Crawler] Cache hit for #{cache_key}")
+        Rails.logger.info("[Crawler] Cached: #{cached.inspect.pretty_inspect}")
         return cached
       end
 
@@ -67,11 +69,11 @@ module LlmsTxt
       end
     end
 
-    # Scheme-agnostic key so http and https versions of the same page count as one visit.
+    # Scheme-agnostic key so http/https, www/non-www, and trailing slash count as one visit.
     def visited_key(url)
       uri = URI.parse(url)
       path = uri.path.to_s.empty? ? "/" : uri.path
-      "#{uri.host}#{path}"
+      "#{normalize_host(uri.host)}#{normalize_path(path)}"
     rescue URI::InvalidURIError
       url
     end
@@ -146,9 +148,21 @@ module LlmsTxt
       return false unless url.start_with?("http://", "https://")
 
       uri = URI.parse(url)
-      uri.host == @base_uri.host
+      normalize_host(uri.host) == normalize_host(@base_uri.host)
     rescue URI::InvalidURIError
       false
+    end
+
+    # Treat www and non-www as same domain (e.g. figma.com and www.figma.com)
+    def normalize_host(host)
+      return host if host.blank?
+      host.start_with?("www.") ? host[4..] : host
+    end
+
+    # Treat /path and /path/ as same page for visit dedup
+    def normalize_path(path)
+      return "/" if path.blank? || path == "/"
+      path.end_with?("/") ? path[0..-2] : path
     end
 
     def absolute_url(href, base_url)

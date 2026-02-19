@@ -15,13 +15,18 @@ A web app that crawls a website and generates an [llms.txt](https://llmstxt.org/
 
 Supports Claude Sonnet 4.5 and GPT-5.2, or a no-model fallback that groups pages by URL path structure.
 
-## Prerequisites
+## Setup Prerequisites
+- Ruby 3.2.2 & Rails 8.0.4
+   - Follow the install instructions at https://guides.rubyonrails.org/install_ruby_on_rails.html
+- PostgreSQL 15.14
+   - Follow the install instructions at https://www.postgresql.org/download/macosx/ or use Homebrew to install via `brew install postgresql@15`
+- Anthropic & OpenAI API Keys (Optional)
+   - Sign up and get an Anthropic API Key at https://platform.claude.com/settings/keys
+   - Sign up and get an OpenAI API Key at https://platform.openai.com/api-keys
 
-- Ruby 3.2.2
-- PostgreSQL (running locally)
-- Chrome or Chromium (used by [Ferrum](https://github.com/rubycdp/ferrum) for JavaScript-rendered pages)
+## Setup Application
 
-## Setup
+Ensure you have all the Prerequisites setup.
 
 ```bash
 git clone https://github.com/WaleyChen/llms-text.git
@@ -34,7 +39,7 @@ bin/dev
 
 The app will be available at `http://localhost:3000`.
 
-### Setting API keys
+### Setup API keys
 
 To enable LLM-powered generation:
 1. Get an API key from https://platform.claude.com/settings/keys and https://platform.openai.com/api-keys.

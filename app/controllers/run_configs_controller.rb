@@ -31,7 +31,7 @@ class RunConfigsController < ApplicationController
       return render_error(error)
     end
     attrs[:url] = url
-    attrs[:max_pages] = attrs[:max_pages].to_s.blank? ? 20 : attrs[:max_pages].to_i
+    attrs[:max_pages] = attrs[:max_pages].to_s.blank? ? 200 : attrs[:max_pages].to_i
     attrs[:max_depth] = attrs[:max_depth].to_s.blank? ? 3 : attrs[:max_depth].to_i
     attrs[:model] = attrs[:model].presence || Run::MODEL_NONE
 
@@ -48,6 +48,8 @@ class RunConfigsController < ApplicationController
 
       models = @run_config.model == Run::MODEL_ALL ? Run::MODELS : [@run_config.model]
       @runs = models.map do |model|
+        next if model == Run::MODEL_CLAUDE_SONNET_4_5 && ENV["ANTHROPIC_API_KEY"].blank?
+        next if model == Run::MODEL_GPT_5_2 && ENV["OPENAI_API_KEY"].blank?
         Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: model)
       end
     end

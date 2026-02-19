@@ -69,7 +69,18 @@ function HomePage() {
           {
             received(data) {
               if (data.run_config) {
-                setRunConfigs((prev) => prev.map((rc) => rc.id === data.run_config.id ? { ...rc, ...data.run_config } : rc))
+                const terminal = (s) => s === "completed" || s === "failed"
+                setRunConfigs((prev) =>
+                  prev.map((rc) => {
+                    if (rc.id !== data.run_config.id) return rc
+                    const merged = { ...rc, ...data.run_config }
+                    // Don't let a non-terminal status (e.g. generating) overwrite an existing terminal status (completed/failed).
+                    if (terminal(rc.status) && merged.status != null && !terminal(merged.status)) {
+                      merged.status = rc.status
+                    }
+                    return merged
+                  })
+                )
                 return
               }
               const run = data.run

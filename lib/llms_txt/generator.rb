@@ -37,6 +37,7 @@ module LlmsTxt
         lines << "> #{@homepage[:description].to_s.strip.presence || 'No description available.'}"
       end
       lines << ""
+      lines << ""
       @run.append_llms_txt(lines)
     end
 

@@ -370,14 +370,15 @@ function HomePage() {
                           onClick: (e) => e.stopPropagation(),
                         }, runConfig.url),
                         useUrlIcon(runConfig.url),
-                        runConfig.status && runConfig.status !== "pending" && createElement("span", {
+                        runConfig.status && createElement("span", {
                           className: `run-config-status run-config-status--${runConfig.status}`,
                         }, runConfig.status)
                       ),
                       createElement("span", {
                         className: "run-configs-list-run-config",
                         "aria-label": "Run settings",
-                      }, `${runConfig.max_pages} pages · ${runConfig.max_depth} depth · ${runConfig.model || "Default"}`)
+                      }, `${runConfig.max_pages} pages · ${runConfig.max_depth} depth · ${runConfig.model || "Default"}`),
+                      ["pending", "crawling", "generating"].includes(runConfig.status) && createElement("span", { className: "run-configs-list-run-spinner run-configs-list-site-spinner" })
                     ),
                     isExpanded &&
                       createElement(

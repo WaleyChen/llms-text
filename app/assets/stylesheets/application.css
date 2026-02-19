@@ -444,6 +444,11 @@ html, body {
   animation: run-configs-list-spin 0.7s linear infinite;
 }
 
+.run-configs-list-site-spinner {
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
 @keyframes run-configs-list-spin {
   to {
     transform: rotate(360deg);
@@ -505,6 +510,11 @@ html, body {
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+.run-config-status--pending {
+  color: #4b5563;
+  background: #f3f4f6;
 }
 
 .run-config-status--crawling {

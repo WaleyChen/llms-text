@@ -3,6 +3,7 @@ class CrawlJob < ApplicationJob
 
   def perform(run_config_id)
     run_config = RunConfig.find(run_config_id)
+    run_config.start_crawl
     url = run_config.url
 
     crawler = LlmsTxt::Crawler.new(
@@ -13,8 +14,11 @@ class CrawlJob < ApplicationJob
     result = crawler.crawl
 
     if result[:error]
-      run_config.runs.each do |run|
-        run.update!(status: Run::STATUS_FAILED, error: result[:error])
+      ActiveRecord::Base.transaction do
+        run_config.runs.each do |run|
+          run.update!(status: Run::STATUS_FAILED, error: result[:error])
+        end
+        run_config.fail
       end
       return
     end

@@ -496,3 +496,33 @@ html, body {
   margin: 0;
   color: #444;
 }
+
+.run-config-status {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.run-config-status--crawling {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.run-config-status--generating {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.run-config-status--completed {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.run-config-status--failed {
+  color: #dc2626;
+  background: #fee2e2;
+}

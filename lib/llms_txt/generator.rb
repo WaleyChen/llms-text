@@ -1,48 +1,56 @@
 # frozen_string_literal: true
 
 require "set"
+require "digest"
 
 module LlmsTxt
   class Generator
     def initialize(run, pages, failed_pages)
       @homepage = pages.first
-      @pages = pages.drop(1) # drop the homepage from the pages array
+      @pages = pages.drop(1) # Exclude the homepage from the pages array
       @num_pages_displayed = 0
       @displayed_urls = Set.new
       @failed_pages = failed_pages
       @model = run.model
+      @run = run
     end
 
     def generate
       lines = []
-      debug_lines = []
-      generate_top_section(lines)
-      generate_url_sections(lines, debug_lines)
-      add_debug_info(debug_lines)
-      {
-        llms_txt: lines.join("\n"),
-        debug_logs: debug_lines.join("\n")
-      }
+      generate_top_section()
+      generate_url_sections()
+      add_debug_info
     end
 
     private
 
-    def generate_top_section(lines)
-      lines << "# #{@homepage[:title] || 'Untitled'}"
+    # Generate the top section/title and description of the llms.txt file
+    def generate_top_section()
+      lines = []
+      if Run::LLM_MODELS.include?(@model)
+        meta = generate_homepage_meta
+        lines << "# #{meta[:title]}"
+        lines << ""
+        lines << "> #{meta[:description]}"
+      else
+        lines << "# #{@homepage[:title] || 'Untitled'}"
+        lines << ""
+        lines << "> #{@homepage[:description].to_s.strip.presence || 'No description available.'}"
+      end
       lines << ""
-      lines << "> #{homepage_description}"
-      lines << ""
+      @run.append_llms_txt(lines)
     end
 
-    def generate_url_sections(lines, debug_lines)
+    def generate_url_sections()
       if @model == Run::MODEL_NONE
-        generate_with_no_model(lines)
+        generate_with_no_model()
       else
-        generate_with_model(@model, lines, debug_lines)
+        generate_with_model(@model)
       end
     end
 
-    def generate_with_no_model(lines)
+    def generate_with_no_model()
+      lines = []
       overview_pages = pages_for_overview
       unless overview_pages.empty?
         lines << "## Overview"
@@ -77,31 +85,31 @@ module LlmsTxt
         end
         lines << ""
       end
+      @run.append_llms_txt(lines)
     end
 
-    def generate_with_model(model, lines, debug_lines)      
-      # Run grouping and title/description generation in parallel
+    def generate_with_model(model)
       all_urls = @pages.map { |p| p[:url].to_s }
       page_by_url = @pages.index_by { |p| p[:url].to_s }
-      
+
       sections_result = nil
       enriched_urls_map = {}
-      
+
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       grouping_thread = Thread.new do
-        sections_result = group_urls_into_sections(debug_lines)
+        sections_result = group_urls_into_sections
       end
-      
+
       enrichment_thread = Thread.new do
-        enriched_urls_map = generate_titles_and_descriptions(all_urls, page_by_url, debug_lines)
+        enriched_urls_map = generate_titles_and_descriptions(all_urls, page_by_url)
       end
-      
+
       grouping_thread.join
       enrichment_thread.join
       elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-      debug_lines << "Step 3 - Total Latency: #{elapsed.round(2)} seconds"
+      @run.append_debug_logs("Step 3 - Total Latency: #{elapsed.round(2)} seconds")
       
-      return generate_with_no_model(lines) unless sections_result
+      return generate_with_no_model() unless sections_result
       
       # Merge grouping with enriched titles/descriptions
       enriched_sections = {}
@@ -111,12 +119,11 @@ module LlmsTxt
         end
       end
       
-      render_llm_sections(enriched_sections, lines)
-      render_missing_pages(lines)
+      render_llm_sections(enriched_sections)
+      render_missing_pages()
     end
 
-    # Step 1: Group URLs into sections (no title/description generation)
-    def group_urls_into_sections(debug_lines)
+    def group_urls_into_sections
       pages_json = @pages.map do |p|
         title = p[:title] || extract_title_from_url(p[:url])
         desc = p[:description].to_s.strip
@@ -125,7 +132,14 @@ module LlmsTxt
       end
       pages_payload = JSON.generate(pages_json)
 
-      debug_lines << "Step 1 - URLs passed for grouping: #{JSON.pretty_generate(pages_json)}"
+      cache_key = "#{@model}:grouping:#{Digest::MD5.hexdigest(pages_payload)}"
+      cached = Rails.cache.read(cache_key)
+      if cached
+        @run.append_debug_logs("Step 1 - Grouping cache hit")
+        return cached
+      end
+
+      @run.append_debug_logs("Step 1 - URLs passed for grouping: #{JSON.pretty_generate(pages_json)}")
 
       prompt = <<~PROMPT
         Given this JSON array of pages from a website crawl, group them into logical sections for an llms.txt file.
@@ -156,24 +170,23 @@ module LlmsTxt
       raw = response.chat_completion.to_s.strip
       raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
       json = JSON.parse(raw)
-      debug_lines << "Step 1 - Grouping result: #{JSON.pretty_generate(json)}"
-      debug_lines << "Step 1 - Grouping latency: #{elapsed.round(2)} seconds"
+      @run.append_debug_logs("Step 1 - Grouping result: #{JSON.pretty_generate(json)}")
+      @run.append_debug_logs("Step 1 - Grouping latency: #{elapsed.round(2)} seconds")
+      Rails.cache.write(cache_key, json, expires_in: 1.day)
       json
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM grouping failed: #{e.message}")
-      debug_lines << "Step 1 - Grouping failed: #{e.message}"
+      @run.append_debug_logs("Step 1 - Grouping failed: #{e.message}")
       nil
     end
 
 
-    # Generate titles and descriptions for URLs
-    def generate_titles_and_descriptions(urls, page_by_url, debug_lines)
-      debug_lines << "Step 2 - Processing #{urls.size} URLs for title/description generation"
-      
-      # Check cache first
+    def generate_titles_and_descriptions(urls, page_by_url)
+      @run.append_debug_logs("Step 2 - Processing #{urls.size} URLs for title/description generation")
+
       cached_results = {}
       urls_to_fetch = []
-      
+
       urls.each do |url|
         cache_key = "#{@model}:#{url}"
         cached = Rails.cache.read(cache_key)
@@ -183,8 +196,8 @@ module LlmsTxt
           urls_to_fetch << url
         end
       end
-      
-      debug_lines << "Step 2 - Found #{cached_results.size} cached, fetching #{urls_to_fetch.size} from LLM"
+
+      @run.append_debug_logs("Step 2 - Found #{cached_results.size} cached, fetching #{urls_to_fetch.size} from LLM")
       
       # Only call LLM for URLs not in cache
       if urls_to_fetch.any?
@@ -223,7 +236,7 @@ module LlmsTxt
           raw = response.chat_completion.to_s.strip
           raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
           results = JSON.parse(raw)
-          debug_lines << "Step 2 - Enrichment latency: #{elapsed.round(2)} seconds"
+          @run.append_debug_logs("Step 2 - Enrichment latency: #{elapsed.round(2)} seconds")
 
           # Convert array to hash keyed by URL
           new_results = results.index_by { |item| item["url"].to_s }
@@ -244,8 +257,8 @@ module LlmsTxt
       end
       
       cached_count = cached_results.size - new_count
-      debug_lines << "Step 2 - Enrichment results: #{JSON.pretty_generate(cached_results)}"
-      debug_lines << "Step 2 - Total enrichments: #{cached_results.size} (#{cached_count} cached, #{new_count} new)"
+      @run.append_debug_logs("Step 2 - Enrichment results: #{JSON.pretty_generate(cached_results)}")
+      @run.append_debug_logs("Step 2 - Total enrichments: #{cached_results.size} (#{cached_count} cached, #{new_count} new)")
       cached_results
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM batch enrichment failed: #{e.message}")
@@ -268,43 +281,39 @@ module LlmsTxt
       end
     end
 
-    def render_llm_sections(sections, lines)
+    def render_llm_sections(sections)
+      lines = []
       page_by_url = @pages.index_by { |p| p[:url].to_s }
 
-      sections.each do |section_name, urls|
-        next if urls.blank?
+      sections.each do |section_name, items|
+        next if items.blank?
 
         lines << "## #{section_name}"
         lines << ""
-        Array(urls).each do |item|
-          url_str = item.is_a?(Hash) ? (item["url"] || item[:url]).to_s.strip : item.to_s.strip
-          page = page_by_url[url_str] || page_by_url.values.find { |p| p[:url].to_s == url_str }
+        items.each do |item|
+          url_str = (item["url"] || item[:url]).to_s.strip
+          page = page_by_url[url_str]
           next unless page
 
           @num_pages_displayed += 1
           @displayed_urls.add(page[:url])
 
-          title = if item.is_a?(Hash) && (item["title"].present? || item[:title].present?)
-            (item["title"] || item[:title]).to_s.strip
-          else
-            page[:title] || extract_title_from_url(page[:url])
-          end
-          description = if item.is_a?(Hash) && (item["description"].present? || item[:description].present?)
-            (item["description"] || item[:description]).to_s.strip
-          else
-            page[:description].to_s.strip
-          end
+          title = (item["title"] || item[:title]).to_s.strip.presence || page[:title] || extract_title_from_url(page[:url])
+          description = (item["description"] || item[:description]).to_s.strip.presence || page[:description].to_s.strip
           line = "- [#{title}](#{page[:url]})"
           line += ": #{description}" if description.present?
           lines << line
         end
         lines << ""
       end
+      @run.append_llms_txt(lines)
     end
 
-    def render_missing_pages(lines)
+    # Render pages not returned by the LLM
+    def render_missing_pages()
       return if pages_not_displayed.empty?
 
+      lines = []
       lines << "## Misc"
       lines << ""
       pages_not_displayed.each do |page|
@@ -313,54 +322,59 @@ module LlmsTxt
         @num_pages_displayed += 1
         @displayed_urls.add(page[:url])
       end
+      @run.append_llms_txt(lines)
     end
 
     # ------------------------------------------------------------
 
-    def add_debug_info(lines)
-      lines << "## Total Pages: #{@pages.size}"
-      lines << "## Total Pages Displayed: #{@num_pages_displayed}"
-      lines << "## Total Failed Pages: #{@failed_pages.size}"
-      lines << "## Pages Not Displayed (#{pages_not_displayed.size})"
-      pages_not_displayed.each do |page|
-        lines << "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})"
-      end
-      lines << "## Failed Pages"
-      lines << @failed_pages.inspect
+    def add_debug_info
+      lines = [
+        "## Total Pages: #{@pages.size}",
+        "## Total Pages Displayed: #{@num_pages_displayed}",
+        "## Total Failed Pages: #{@failed_pages.size}",
+        "## Pages Not Displayed (#{pages_not_displayed.size})",
+        *pages_not_displayed.map { |page| "- #{page[:url]} (depth: #{page[:depth]}, segments: #{path_segment_count(page[:url])})" },
+        "## Failed Pages",
+        @failed_pages.inspect,
+      ]
+      @run.append_debug_logs(lines)
     end
 
     def pages_not_displayed
       @pages.reject { |p| @displayed_urls.include?(p[:url]) }
     end
 
-    def homepage_description
-      return generate_description_via_llm if Run::LLM_MODELS.include?(@model)
-      return @homepage[:description] if @homepage[:description].to_s.strip != ""
-      "No description available."
-    end
-
-    def generate_description_via_llm
-      cache_key = "#{@model}:description:#{@homepage[:url]}"
+    def generate_homepage_meta
+      cache_key = "#{@model}:homepage_meta:#{@homepage[:url]}"
       cached = Rails.cache.read(cache_key)
       return cached if cached
 
       llm = create_llm_instance
       content = build_description_context
       prompt = <<~PROMPT
-        Write a brief 2-4 sentence description for this website's llms.txt file.
-        Be concise and informative. Output only the description, no quotes or preamble.
+        Given this website's homepage, generate a clean title and description for an llms.txt file.
+
+        - title: A clean, concise title for the website (not the page). Remove taglines or marketing fluff.
+        - description: A brief 2-4 sentence description of what this website/product is. Be concise and informative. Optimized for LLMs.
+
+        Return ONLY valid JSON: {"title": "...", "description": "..."}
 
         Site title: #{@homepage[:title] || 'Untitled'}
         Content excerpt:
         #{content}
       PROMPT
       response = llm.chat(messages: [{ role: "user", content: prompt }])
-      result = response.chat_completion.to_s.strip.presence || "No description available."
+      raw = response.chat_completion.to_s.strip
+      raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
+      json = JSON.parse(raw)
+      result = { title: json["title"].to_s.strip, description: json["description"].to_s.strip }
+      result[:title] = @homepage[:title] || "Untitled" if result[:title].blank?
+      result[:description] = "No description available." if result[:description].blank?
       Rails.cache.write(cache_key, result, expires_in: 30.days)
       result
     rescue StandardError => e
-      Rails.logger.warn("[Generator] LLM description failed: #{e.message}")
-      "No description available."
+      Rails.logger.warn("[Generator] LLM homepage meta failed: #{e.message}")
+      { title: @homepage[:title] || "Untitled", description: "No description available." }
     end
 
     def build_description_context

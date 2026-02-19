@@ -79,7 +79,7 @@ module LlmsTxt
     def crawl_page(url, parent_url: nil, depth: 0)
       url = normalize_url(url)
       visited_key = visited_key(url)
-      
+
       # Protect the visited set and pages array from concurrent access
       @mutex.synchronize do
         return if depth > @max_depth || @visited.include?(visited_key) || @pages.size >= @max_pages
@@ -93,12 +93,12 @@ module LlmsTxt
         if status >= 200 && status < 300
           body = response.body
         else
-          @failed_pages << {url: url, status: status}
+          @mutex.synchronize { @failed_pages << {url: url, status: status} }
           Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{status}")
           return
         end
       rescue StandardError => e
-        @failed_pages << {url: url, error: e.message}
+        @mutex.synchronize { @failed_pages << {url: url, error: e.message} }
         Rails.logger.warn("[Fetcher] Failed to fetch #{url}: #{e.message}")
         return
       end
@@ -118,10 +118,6 @@ module LlmsTxt
         if depth < @max_depth && @pages.size < @max_pages
           links_to_follow = collect_follow_links(doc, url, depth + 1)
         end
-      end
-
-      if Rails.env.development?
-        puts "links_to_follow: #{links_to_follow.inspect}"
       end
 
       return if links_to_follow.blank?

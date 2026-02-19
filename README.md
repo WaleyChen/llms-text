@@ -4,6 +4,17 @@ A web app that crawls a website and generates an [llms.txt](https://llmstxt.org/
 
 **Live App:** https://llmstxt.dev/
 
+## How It Works
+
+1. **URL Validation** — The submitted URL is validated (format, DNS resolution, SSRF protection) and checked for reachability via Faraday with redirect following.
+2. **Crawling** — A concurrent crawler (4 threads) traverses the site, respecting max pages and max depth limits. It extracts page titles, descriptions, and content using Nokogiri. JavaScript-rendered pages are detected and fetched via a headless Chrome browser (Ferrum). Crawl results are cached for 1 day.
+3. **LLM Generation** — Two parallel LLM calls run simultaneously:
+   - **Grouping** — Groups the crawled URLs into logical sections (e.g. Overview, Docs, Blog).
+   - **Enrichment** — Generates clean titles and LLM-optimized descriptions for each URL. Results are cached per URL for 30 days.
+4. **Output** — The grouped and enriched data is assembled into a Markdown file following the [llms.txt specification](https://llmstxt.org/). Results are streamed to the browser in real time via a WebSocket.
+
+Supports Claude Sonnet 4.5 and GPT-5.2, or a no-model fallback that groups pages by URL path structure.
+
 ## Prerequisites
 
 - Ruby 3.2.2

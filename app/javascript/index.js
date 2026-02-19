@@ -55,9 +55,10 @@ function HomePage() {
     cableRef.current = ActionCable.createConsumer(url)
   }, [])
 
+  // Subscribe to ActionCable for every run config so we receive status updates (pending/crawling/generating/completed/failed) for all rows.
   useEffect(() => {
     if (!cableRef.current) return
-    const ids = [...expandedSiteIds].map(Number).filter(Boolean)
+    const ids = runConfigs.map((rc) => Number(rc.id)).filter(Boolean)
     const subs = subscriptionsRef.current
     ids.forEach((siteId) => {
       if (subs[siteId]) return
@@ -66,6 +67,10 @@ function HomePage() {
           { channel: "RunConfigChannel", run_config_id: siteId },
           {
             received(data) {
+              if (data.run_config) {
+                setRunConfigs((prev) => prev.map((rc) => rc.id === data.run_config.id ? { ...rc, ...data.run_config } : rc))
+                return
+              }
               const run = data.run
               if (!run || !run.id) return
               console.log("[Cable] run update", run.id, run.status)
@@ -82,32 +87,34 @@ function HomePage() {
             },
           }
         )
-        setTimeout(() => { // Re-fetch runs to catch any missed broadcasts during subscription handshake
-          fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
-            .then((res) => (res.ok ? res.json() : []))
-            .then((data) => {
-              const fresh = Array.isArray(data) ? data : []
-              setRunsBySiteId((prev) => {
-                const existing = prev[siteId] || []
-                const merged = [...fresh]
-                existing.forEach((r) => { if (!merged.find((m) => m.id === r.id)) merged.push(r) })
-                return { ...prev, [siteId]: merged }
+        if (expandedSiteIds.has(siteId)) {
+          setTimeout(() => { // Re-fetch runs only for expanded rows to catch any missed broadcasts during subscription handshake
+            fetch(`/run_configs/${siteId}/runs.json`, { headers: { Accept: "application/json" } })
+              .then((res) => (res.ok ? res.json() : []))
+              .then((data) => {
+                const fresh = Array.isArray(data) ? data : []
+                setRunsBySiteId((prev) => {
+                  const existing = prev[siteId] || []
+                  const merged = [...fresh]
+                  existing.forEach((r) => { if (!merged.find((m) => m.id === r.id)) merged.push(r) })
+                  return { ...prev, [siteId]: merged }
+                })
               })
-            })
-            .catch(() => {})
-        }, 200)
+              .catch(() => {})
+          }, 200)
+        }
       } catch (e) {
         console.warn("[Cable] subscribe failed for", siteId, e)
       }
     })
     Object.keys(subs).forEach((key) => {
       const id = Number(key)
-      if (!expandedSiteIds.has(id)) {
+      if (!ids.includes(id)) {
         subs[id]?.unsubscribe()
         delete subs[id]
       }
     })
-  }, [expandedSiteIds])
+  }, [runConfigs, expandedSiteIds])
 
   function formatDuration(startedAt, finishedAt) {
     if (!startedAt || !finishedAt) return null
@@ -362,7 +369,10 @@ function HomePage() {
                           className: "run-configs-list-site-url",
                           onClick: (e) => e.stopPropagation(),
                         }, runConfig.url),
-                        useUrlIcon(runConfig.url)
+                        useUrlIcon(runConfig.url),
+                        runConfig.status && runConfig.status !== "pending" && createElement("span", {
+                          className: `run-config-status run-config-status--${runConfig.status}`,
+                        }, runConfig.status)
                       ),
                       createElement("span", {
                         className: "run-configs-list-run-config",
@@ -408,27 +418,23 @@ function HomePage() {
                                         ? createElement("span", { className: "run-configs-list-run-duration" }, formatDuration(run.started_at, run.finished_at))
                                         : createElement("span", { className: "run-configs-list-run-duration" }, "—"),
                                       createElement("span", { className: "run-configs-list-run-model" }, run.model || runConfig.model || "—"),
-                                      run.status === "completed"
-                                        ? createElement(
-                                            "span",
-                                            { className: "run-configs-list-run-action run-configs-list-run-actions" },
-                                            createElement("a", {
-                                              href: `/runs/${run.id}/llms_txt`,
-                                              target: "_blank",
-                                              rel: "noopener noreferrer",
-                                              className: "run-configs-list-run-view-btn",
-                                            }, "View"),
-                                            createElement("a", {
-                                              href: `/runs/${run.id}/debug`,
-                                              target: "_blank",
-                                              rel: "noopener noreferrer",
-                                              className: "run-configs-list-run-view-btn run-configs-list-run-debug-btn",
-                                            }, "Debug")
-                                          )
-                                        : run.status === "running"
-                                          ? createElement("span", { className: "run-configs-list-run-action", "aria-label": "Running" },
-                                              createElement("span", { className: "run-configs-list-run-spinner" }))
-                                          : createElement("span", { className: "run-configs-list-run-action" })
+                                      createElement(
+                                        "span",
+                                        { className: "run-configs-list-run-action run-configs-list-run-actions" },
+                                        run.status === "running" && createElement("span", { className: "run-configs-list-run-spinner" }),
+                                        (run.status === "pending" || run.status === "running" || run.status === "completed") && createElement("a", {
+                                          href: `/runs/${run.id}/llms_txt`,
+                                          target: "_blank",
+                                          rel: "noopener noreferrer",
+                                          className: "run-configs-list-run-view-btn",
+                                        }, "View"),
+                                        createElement("a", {
+                                          href: `/runs/${run.id}/debug`,
+                                          target: "_blank",
+                                          rel: "noopener noreferrer",
+                                          className: "run-configs-list-run-view-btn run-configs-list-run-debug-btn",
+                                        }, "Debug")
+                                      )
                                     )
                                   )
                                 )

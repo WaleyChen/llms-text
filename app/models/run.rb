@@ -24,18 +24,39 @@ class Run < ApplicationRecord
     self.started_at = Time.now
     self.status = STATUS_RUNNING
     self.save!
+    broadcast_run_update
   end
 
   def complete
     self.finished_at = Time.now
     self.status = STATUS_COMPLETED
     self.save!
+    broadcast_run_update
   end
 
   def fail
     self.finished_at = Time.now
     self.status = STATUS_FAILED
     self.save!
+    broadcast_run_update
+  end
+
+  def append_debug_logs(lines)
+    return if lines.blank?
+
+    self.debug_logs ||= ""
+    self.debug_logs += (lines.is_a?(String) ? [lines] : Array(lines)).join("\n")
+    self.debug_logs += "\n" unless self.debug_logs.end_with?("\n")
+    save!
+  end
+
+  def append_llms_txt(lines)
+    return if lines.blank?
+
+    self.llms_txt ||= ""
+    self.llms_txt += (lines.is_a?(String) ? [lines] : Array(lines)).join("\n")
+    self.llms_txt += "\n" unless self.llms_txt.end_with?("\n")
+    save!
   end
 
   # Broadcasts the run update to the client

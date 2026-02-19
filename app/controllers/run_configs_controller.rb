@@ -27,29 +27,28 @@ class RunConfigsController < ApplicationController
     attrs[:max_depth] = attrs[:max_depth].to_s.blank? ? 3 : attrs[:max_depth].to_i
     attrs[:model] = attrs[:model].presence || Run::MODEL_NONE
 
-    @run_config = RunConfig.new(url: attrs[:url])
+    # Create the run config and runs in a transaction
+    @run_config = RunConfig.new(url: attrs[:url], status: RunConfig::STATUS_PENDING)
     @run_config.assign_attributes(attrs.slice(:max_pages, :max_depth, :model))
-    if @run_config.save
-      if @run_config.model == Run::MODEL_ALL
-        @runs = []
-        Run::MODELS.each do |model|
-          @runs << Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: model)
-        end
-      else
-        @runs = [Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: @run_config.model)]
-      end
+    ActiveRecord::Base.transaction do
+      @run_config.save!
 
-      CrawlJob.perform_later(@run_config.id)
+      models = @run_config.model == Run::MODEL_ALL ? Run::MODELS : [@run_config.model]
+      @runs = models.map do |model|
+        Run.create!(run_config_id: @run_config.id, status: Run::STATUS_PENDING, model: model)
+      end
+    end
 
-      respond_to do |format|
-        format.json { render json: { run_config: @run_config, runs: @runs }, status: :created }
-        format.html { redirect_to root_path, notice: "Run config added." }
-      end
-    else
-      respond_to do |format|
-        format.json { render json: { errors: @run_config.errors.full_messages }, status: :unprocessable_entity }
-        format.html { redirect_to root_path, alert: @run_config.errors.full_messages.to_sentence }
-      end
+    CrawlJob.perform_later(@run_config.id)
+
+    respond_to do |format|
+      format.json { render json: { run_config: @run_config, runs: @runs }, status: :created }
+      format.html { redirect_to root_path, notice: "Run config added." }
+    end
+  rescue ActiveRecord::RecordInvalid # Handle validation errors
+    respond_to do |format|
+      format.json { render json: { errors: @run_config.errors.full_messages }, status: :unprocessable_entity }
+      format.html { redirect_to root_path, alert: @run_config.errors.full_messages.to_sentence }
     end
   end
 

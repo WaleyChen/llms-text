@@ -16,21 +16,41 @@ module LlmsTxt
     end
 
     def generate
-      generate_top_section()
-      generate_url_sections()
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      @run.append_debug_logs("Generating the LLMs.txt file")
+
+      top_lines = nil
+      url_lines = nil
+      t1 = Thread.new { top_lines = generate_top_section() }
+      t2 = Thread.new { url_lines = generate_url_sections() }
+      t1.join
+      t2.join
+
+      @run.append_llms_txt(top_lines)
+      @run.append_llms_txt(url_lines)
       add_debug_info
+
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      @run.append_debug_logs("Total Latency: #{elapsed.round(2)} seconds")
     end
 
     private
 
-    # Generate the top section/title and description of the llms.txt file
+    # Generate the top section/title, description, and optional more-details of the llms.txt file. Returns lines (does not append).
     def generate_top_section()
+      @run.append_debug_logs("Generating the Top Section")
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
       lines = []
       if Run::LLM_MODELS.include?(@model)
         meta = generate_homepage_meta
         lines << "# #{meta[:title]}"
         lines << ""
         lines << "> #{meta[:description]}"
+        if meta[:more_details].to_s.strip.present?
+          lines << ""
+          lines.concat(meta[:more_details].to_s.strip.split("\n"))
+        end
       else
         lines << "# #{@homepage[:title] || 'Untitled'}"
         lines << ""
@@ -38,7 +58,10 @@ module LlmsTxt
       end
       lines << ""
       lines << ""
-      @run.append_llms_txt(lines)
+
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+      @run.append_debug_logs("Top Section Latency: #{elapsed.round(2)} seconds")
+      lines
     end
 
     def generate_url_sections()
@@ -85,7 +108,7 @@ module LlmsTxt
         end
         lines << ""
       end
-      @run.append_llms_txt(lines)
+      lines
     end
 
     def generate_with_model(model)
@@ -95,7 +118,6 @@ module LlmsTxt
       sections_result = nil
       enriched_urls_map = {}
 
-      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       grouping_thread = Thread.new do
         sections_result = group_urls_into_sections
       end
@@ -106,8 +128,6 @@ module LlmsTxt
 
       grouping_thread.join
       enrichment_thread.join
-      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
-      @run.append_debug_logs("Step 3 - Total Latency: #{elapsed.round(2)} seconds")
       
       return generate_with_no_model() unless sections_result
       
@@ -119,8 +139,7 @@ module LlmsTxt
         end
       end
       
-      render_llm_sections(enriched_sections)
-      render_missing_pages()
+      render_llm_sections(enriched_sections) + render_missing_pages()
     end
 
     def group_urls_into_sections
@@ -135,7 +154,7 @@ module LlmsTxt
       cache_key = "#{@model}:grouping:#{Digest::MD5.hexdigest(pages_payload)}"
       cached = Rails.cache.read(cache_key)
       if cached
-        @run.append_debug_logs("Step 1 - Grouping cache hit")
+        @run.append_debug_logs("Grouping Cache Hit")
         return cached
       end
 
@@ -170,8 +189,10 @@ module LlmsTxt
       raw = response.chat_completion.to_s.strip
       raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
       json = JSON.parse(raw)
-      @run.append_debug_logs("Step 1 - Grouping result: #{JSON.pretty_generate(json)}")
-      @run.append_debug_logs("Step 1 - Grouping latency: #{elapsed.round(2)} seconds")
+
+      @run.append_debug_logs("Grouping Result: #{JSON.pretty_generate(json)}")
+      @run.append_debug_logs("Grouping Latency: #{elapsed.round(2)} seconds")
+
       Rails.cache.write(cache_key, json, expires_in: 1.day)
       json
     rescue StandardError => e
@@ -306,12 +327,12 @@ module LlmsTxt
         end
         lines << ""
       end
-      @run.append_llms_txt(lines)
+      lines
     end
 
-    # Render pages not returned by the LLM
+    # Render pages not returned by the LLM. Returns lines (or [] if none missing).
     def render_missing_pages()
-      return if pages_not_displayed.empty?
+      return [] if pages_not_displayed.empty?
 
       lines = []
       lines << "## Misc"
@@ -322,7 +343,7 @@ module LlmsTxt
         @num_pages_displayed += 1
         @displayed_urls.add(page[:url])
       end
-      @run.append_llms_txt(lines)
+      lines
     end
 
     # ------------------------------------------------------------
@@ -345,36 +366,62 @@ module LlmsTxt
     end
 
     def generate_homepage_meta
-      cache_key = "#{@model}:homepage_meta:#{@homepage[:url]}"
+      urls_payload = build_urls_for_homepage_prompt
+      cache_key = "#{@model}:homepage_meta:#{@homepage[:url]}:#{Digest::MD5.hexdigest(urls_payload)}"
       cached = Rails.cache.read(cache_key)
       return cached if cached
 
       llm = create_llm_instance
       content = build_description_context
       prompt = <<~PROMPT
-        Given this website's homepage, generate a clean title and description for an llms.txt file.
+        Given this website's homepage and the list of URLs that will appear in the llms.txt file below, generate:
 
-        - title: A clean, concise title for the website (not the page). Remove taglines or marketing fluff.
-        - description: A brief 2-4 sentence description of what this website/product is. Be concise and informative. Optimized for LLMs.
+        1. **title** — A clean, concise title for the website (not the page). Remove taglines or marketing fluff.
+        2. **description** — A brief 2-4 sentence description of what this website/product is. Be concise and informative. Optimized for LLMs.
+        3. **more_details** — Zero or more markdown sections (no headings). 
+          Provide concise, high-signal project context that is NOT already obvious from the URL structure. 
+          Focus on:
+          - the project’s purpose and core capabilities,
+          - primary audiences or use cases,
+          - any meaningful differentiators or unique characteristics.
 
-        Return ONLY valid JSON: {"title": "...", "description": "..."}
+        Return ONLY valid JSON:
+        {"title": "...", "description": "...", "more_details": "..."}
+
+        For more_details use a single string; use \\n for newlines. No markdown headings (no # or ##). Paragraphs and lists are fine.
 
         Site title: #{@homepage[:title] || 'Untitled'}
         Content excerpt:
         #{content}
+
+        URLs that will appear in this llms.txt (for context when writing more_details):
+        #{urls_payload}
       PROMPT
       response = llm.chat(messages: [{ role: "user", content: prompt }])
       raw = response.chat_completion.to_s.strip
       raw = raw.gsub(/\A```(?:json)?\s*/, "").gsub(/\s*```\z/, "")
       json = JSON.parse(raw)
-      result = { title: json["title"].to_s.strip, description: json["description"].to_s.strip }
+      result = {
+        title: json["title"].to_s.strip,
+        description: json["description"].to_s.strip,
+        more_details: json["more_details"].to_s.strip
+      }
       result[:title] = @homepage[:title] || "Untitled" if result[:title].blank?
       result[:description] = "No description available." if result[:description].blank?
       Rails.cache.write(cache_key, result, expires_in: 30.days)
       result
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM homepage meta failed: #{e.message}")
-      { title: @homepage[:title] || "Untitled", description: "No description available." }
+      { title: @homepage[:title] || "Untitled", description: "No description available.", more_details: "" }
+    end
+
+    def build_urls_for_homepage_prompt
+      @pages.map do |p|
+        title = p[:title] || extract_title_from_url(p[:url])
+        desc = p[:description].to_s.strip[0..60]
+        desc = "#{desc}..." if desc.length >= 60
+        "- #{p[:url]} | #{title}#{desc.present? ? " | #{desc}" : ""}"
+      end.join("\n")
     end
 
     def build_description_context

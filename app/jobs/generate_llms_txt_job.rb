@@ -18,7 +18,9 @@ class GenerateLlmsTxtJob < ApplicationJob
     run.complete
     run.run_config.complete
   rescue StandardError => e
+    run.append_debug_logs("GenerateLlmsTxtJob Error: #{e.message}")
     run&.fail # Fail the run
+    run.run_config.fail
     raise e
   end
 end

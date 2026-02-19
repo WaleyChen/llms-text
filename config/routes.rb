@@ -7,7 +7,7 @@ Rails.application.routes.draw do
       get :debug
     end
   end
-  resources :run_configs do
+  resources :run_configs, only: %i[index show create] do
     resources :runs, only: %i[index], module: :run_configs
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html

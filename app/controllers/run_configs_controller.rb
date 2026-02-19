@@ -13,6 +13,14 @@ class RunConfigsController < ApplicationController
     end
   end
 
+  def show
+    @run_config = RunConfig.find(params[:id])
+    respond_to do |format|
+      format.json { render json: @run_config }
+      format.html { redirect_to root_path }
+    end
+  end
+
   def create
     request.format = :json if request.headers["Accept"]&.include?("application/json")
     

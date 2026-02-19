@@ -232,6 +232,17 @@ function HomePage() {
                       }))
                     }
                     setExpandedSiteIds((prev) => new Set([...prev, runConfig.id]))
+                    const createdId = runConfig.id
+                    setTimeout(() => {
+                      fetch(`/run_configs/${createdId}.json`, { headers: { Accept: "application/json" } })
+                        .then((r) => (r.ok ? r.json() : null))
+                        .then((fresh) => {
+                          if (fresh) {
+                            setRunConfigs((prev) => prev.map((rc) => (rc.id === createdId ? { ...rc, ...fresh } : rc)))
+                          }
+                        })
+                        .catch(() => {})
+                    }, 300)
                   }
                 } else {
                   const msg = data.errors?.join?.(" ") || "Failed to add run config"

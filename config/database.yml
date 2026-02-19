@@ -17,7 +17,8 @@ default: &default
   encoding: unicode
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # DATABASE_POOL: use on Heroku so 4×pool×dynos <= plan limit (e.g. pool=2 for 2 dynos on 20-conn plan).
+  pool: <%= ENV["DATABASE_POOL"].presence || ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
 
 development:

@@ -290,12 +290,14 @@ module LlmsTxt
       if @model.to_s == Run::MODEL_CLAUDE_SONNET_4_5
         Langchain::LLM::Anthropic.new(
           api_key: ENV["ANTHROPIC_API_KEY"],
-          default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.2, max_tokens: 8192 }
+          default_options: { chat_model: Run::MODEL_CLAUDE_SONNET_4_5, temperature: 0.2, max_tokens: 8192 },
+          llm_options: { max_retries: 3, timeout: 60 }
         )
       elsif @model.to_s == Run::MODEL_GPT_5_2
         Langchain::LLM::OpenAI.new(
           api_key: ENV["OPENAI_API_KEY"],
-          default_options: { chat_model: Run::MODEL_GPT_5_2, temperature: 0.2 }
+          default_options: { chat_model: Run::MODEL_GPT_5_2, temperature: 0.2 },
+          llm_options: { max_retries: 3, timeout: 60 }
         )
       else
         raise "Invalid model: #{@model}"
@@ -412,7 +414,8 @@ module LlmsTxt
       result
     rescue StandardError => e
       Rails.logger.warn("[Generator] LLM homepage meta failed: #{e.message}")
-      { title: @homepage[:title] || "Untitled", description: "No description available.", more_details: "" }
+      title = @homepage && @homepage[:title].presence || "Untitled"
+      { title: title, description: "No description available.", more_details: "" }
     end
 
     def build_urls_for_homepage_prompt

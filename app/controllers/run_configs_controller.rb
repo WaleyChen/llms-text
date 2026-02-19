@@ -123,24 +123,52 @@ class RunConfigsController < ApplicationController
     end
 
     [nil, "URL is not reachable. Please check the URL and try again."]
-  rescue URI::InvalidURIError
+  rescue URI::InvalidURIError => e
+    Rails.logger.warn("[URL Validation] Invalid URI for #{raw}: #{e.message}")
     [nil, "URL is not valid."]
-  rescue Resolv::ResolvError
+  rescue Resolv::ResolvError => e
+    Rails.logger.warn("[URL Validation] DNS resolution failed for #{uri.host}: #{e.message}")
     [nil, "Could not resolve hostname. Please check the URL."]
   end
 
-  # Checks if the URL is reachable by trying to connect to it with a HEAD request
+  # Checks if the URL is reachable by trying HEAD first, then GET if HEAD fails (some sites reject HEAD)
   def reachable?(url)
     conn = Faraday.new do |f|
       f.response :follow_redirects, limit: 3
       f.adapter Faraday.default_adapter
     end
-    response = conn.head(url) do |req|
-      req.options.timeout = 5
-      req.options.open_timeout = 5
+    
+    # Try HEAD first (faster, no body)
+    begin
+      response = conn.head(url) do |req|
+        req.headers["User-Agent"] = "llms-txt-fetcher/0.1"
+        req.options.timeout = 10
+        req.options.open_timeout = 5
+      end
+      # Accept 2xx/3xx as success; also accept 403/429 as "reachable" (site exists, just blocking)
+      status_ok = response.status < 400 || [403, 429].include?(response.status)
+      Rails.logger.debug("[Reachability] HEAD #{url}: #{response.status}") if Rails.env.development?
+      return status_ok
+    rescue Faraday::Error => e
+      Rails.logger.debug("[Reachability] HEAD #{url} failed: #{e.class} - #{e.message}") if Rails.env.development?
+      # HEAD failed, try GET (some sites like Quora reject HEAD)
     end
-    response.status < 400
-  rescue Faraday::Error
-    false
+    
+    # Fallback to GET with range header to limit body size
+    begin
+      response = conn.get(url) do |req|
+        req.headers["User-Agent"] = "llms-txt-fetcher/0.1"
+        req.headers["Range"] = "bytes=0-1023" # Only fetch first 1KB
+        req.options.timeout = 10
+        req.options.open_timeout = 5
+      end
+      # Accept 2xx/3xx as success; also accept 403/429 as "reachable" (site exists, just blocking)
+      status_ok = response.status < 400 || [403, 429].include?(response.status)
+      Rails.logger.debug("[Reachability] GET #{url}: #{response.status}") if Rails.env.development?
+      status_ok
+    rescue Faraday::Error => e
+      Rails.logger.debug("[Reachability] GET #{url} failed: #{e.class} - #{e.message}") if Rails.env.development?
+      false
+    end
   end
 end

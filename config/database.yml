@@ -17,7 +17,9 @@ default: &default
   encoding: unicode
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  # DATABASE_POOL: use on Heroku so 4×pool×dynos <= plan limit (e.g. pool=2 for 2 dynos on 20-conn plan).
+  # On Heroku each process uses 4 pools (primary/cache/queue/cable) → 4×pool×dynos = total connections.
+  # Set DATABASE_POOL so 4×pool×max_dynos <= your Postgres plan limit (see heroku pg:info).
+  # When scaling dynos, recalc pool or use a conservative value; or use PgBouncer (Standard+) so pool is less sensitive.
   pool: <%= ENV["DATABASE_POOL"].presence || ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
 

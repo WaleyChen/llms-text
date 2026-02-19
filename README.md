@@ -20,7 +20,7 @@ Supports Claude Sonnet 4.5 and GPT-5.2, or a no-model fallback that groups pages
    - Follow the install instructions at https://guides.rubyonrails.org/install_ruby_on_rails.html
 2. PostgreSQL 15.14
    - Use Homebrew to install via `brew install postgresql@15`
-3. Anthropic & OpenAI API Keys (Optional)
+3. Anthropic & OpenAI API Keys (Optional for LLM generation)
    - Sign up and get an Anthropic API Key at https://platform.claude.com/settings/keys
    - Sign up and get an OpenAI API Key at https://platform.openai.com/api-keys
 
@@ -40,7 +40,7 @@ The app will be available at `http://localhost:3000`.
 
 ### Setup API keys
 
-To enable LLM-powered generation:
+To enable LLM generation of llms.txt:
 1. Get an API key from https://platform.claude.com/settings/keys and https://platform.openai.com/api-keys.
 2. Export the keys to your shell:
 ```bash

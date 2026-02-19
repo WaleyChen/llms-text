@@ -421,7 +421,6 @@ function HomePage() {
                                       createElement(
                                         "span",
                                         { className: "run-configs-list-run-action run-configs-list-run-actions" },
-                                        run.status === "running" && createElement("span", { className: "run-configs-list-run-spinner" }),
                                         (run.status === "pending" || run.status === "running" || run.status === "completed") && createElement("a", {
                                           href: `/runs/${run.id}/llms_txt`,
                                           target: "_blank",
@@ -433,7 +432,8 @@ function HomePage() {
                                           target: "_blank",
                                           rel: "noopener noreferrer",
                                           className: "run-configs-list-run-view-btn run-configs-list-run-debug-btn",
-                                        }, "Debug")
+                                        }, "Debug"),
+                                        run.status === "running" && createElement("span", { className: "run-configs-list-run-spinner" })
                                       )
                                     )
                                   )

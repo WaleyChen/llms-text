@@ -16,7 +16,6 @@ module LlmsTxt
     end
 
     def generate
-      lines = []
       generate_top_section()
       generate_url_sections()
       add_debug_info

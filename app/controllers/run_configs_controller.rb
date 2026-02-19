@@ -28,8 +28,13 @@ class RunConfigsController < ApplicationController
     attrs[:model] = attrs[:model].presence || Run::MODEL_NONE
 
     # Create the run config and runs in a transaction
-    @run_config = RunConfig.new(url: attrs[:url], status: RunConfig::STATUS_PENDING)
-    @run_config.assign_attributes(attrs.slice(:max_pages, :max_depth, :model))
+    @run_config = RunConfig.new(
+      url: attrs[:url],
+      status: RunConfig::STATUS_PENDING,
+      max_pages: attrs[:max_pages],
+      max_depth: attrs[:max_depth],
+      model: attrs[:model]
+    )
     ActiveRecord::Base.transaction do
       @run_config.save!
 

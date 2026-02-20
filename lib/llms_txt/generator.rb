@@ -148,7 +148,7 @@ module LlmsTxt
         desc = p[:description].to_s.strip
         desc = "#{desc[0..80]}..." if desc.length > 80
         { url: p[:url].to_s, title: title.to_s, description: desc }
-      end
+      end.sort_by { |h| h[:url] }
       pages_payload = JSON.generate(pages_json)
 
       cache_key = "#{@model}:grouping:#{Digest::MD5.hexdigest(pages_payload)}"

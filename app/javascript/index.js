@@ -8,8 +8,8 @@ function HomePage() {
   const [expandedSiteIds, setExpandedSiteIds] = useState(() => new Set())
   const [runsBySiteId, setRunsBySiteId] = useState({})
   const [loadingRunsForIds, setLoadingRunsForIds] = useState(() => new Set())
-  const [maxPages, setMaxPages] = useState(20)
-  const [maxDepth, setMaxDepth] = useState(3)
+  const [maxPages, setMaxPages] = useState("20")
+  const [maxDepth, setMaxDepth] = useState("3")
   const [model, setModel] = useState("all")
   const cableRef = useRef(null)
   const subscriptionsRef = useRef({})
@@ -290,47 +290,41 @@ function HomePage() {
               "label",
               { className: "prompt-option", htmlFor: "run-max-pages" },
               createElement("span", { className: "prompt-option-label" }, "Max Pages"),
-              createElement("input", {
-                id: "run-max-pages",
-                type: "number",
-                name: "run_config[max_pages]",
-                className: "prompt-option-input",
-                min: 1,
-                max: 999,
-                "aria-label": "Max pages to crawl",
-                value: maxPages === "" ? "" : maxPages,
-                onChange: (e) => {
-                  const v = e.target.value
-                  if (v === "") setMaxPages("")
-                  else {
-                    const n = parseInt(v, 10)
-                    if (!Number.isNaN(n) && n >= 1 && n <= 999) setMaxPages(n)
-                  }
+              createElement(
+                "select",
+                {
+                  id: "run-max-pages",
+                  name: "run_config[max_pages]",
+                  className: "prompt-option-select",
+                  "aria-label": "Max pages to crawl",
+                  value: maxPages,
+                  onChange: (e) => setMaxPages(e.target.value),
                 },
-              })
+                createElement("option", { value: "10" }, "10"),
+                createElement("option", { value: "20" }, "20"),
+                createElement("option", { value: "30" }, "30"),
+                createElement("option", { value: "40" }, "40"),
+                createElement("option", { value: "50" }, "50")
+              )
             ),
             createElement(
               "label",
               { className: "prompt-option", htmlFor: "run-max-depth" },
               createElement("span", { className: "prompt-option-label" }, "Max Depth"),
-              createElement("input", {
-                id: "run-max-depth",
-                type: "number",
-                name: "run_config[max_depth]",
-                className: "prompt-option-input",
-                min: 1,
-                max: 10,
-                "aria-label": "Max crawl depth",
-                value: maxDepth === "" ? "" : maxDepth,
-                onChange: (e) => {
-                  const v = e.target.value
-                  if (v === "") setMaxDepth("")
-                  else {
-                    const n = parseInt(v, 10)
-                    if (!Number.isNaN(n) && n >= 1 && n <= 10) setMaxDepth(n)
-                  }
+              createElement(
+                "select",
+                {
+                  id: "run-max-depth",
+                  name: "run_config[max_depth]",
+                  className: "prompt-option-select",
+                  "aria-label": "Max crawl depth",
+                  value: maxDepth,
+                  onChange: (e) => setMaxDepth(e.target.value),
                 },
-              })
+                createElement("option", { value: "1" }, "1"),
+                createElement("option", { value: "2" }, "2"),
+                createElement("option", { value: "3" }, "3")
+              )
             ),
             createElement(
               "label",
@@ -340,7 +334,7 @@ function HomePage() {
                 "select",
                 {
                   name: "run_config[model]",
-                  className: "prompt-option-select",
+                  className: "prompt-option-select prompt-option-select--max-pages",
                   value: model,
                   onChange: (e) => setModel(e.target.value),
                 },

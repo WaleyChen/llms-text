@@ -16,17 +16,17 @@ class CrawlJob < ApplicationJob
     Rails.logger.info("[CrawlJob] Result: #{result.inspect.pretty_inspect}")
 
     if result[:error]
-      ActiveRecord::Base.transaction do
-        run_config.runs.each do |run|
-          run.update!(status: Run::STATUS_FAILED, error: result[:error])
-        end
-        run_config.fail
-      end
+      run_config.fail_all_runs(result[:error])
       return
     end
 
     run_config.runs.each do |run|
       GenerateLlmsTxtJob.perform_later(run.id)
     end
+  rescue StandardError => e
+    Rails.logger.error("[CrawlJob] Failed: #{e.message}\n#{e.backtrace.first(10).join("\n")}")
+    run_config = RunConfig.find_by(id: run_config_id)
+    run_config.fail_all_runs(e.message) if run_config
+    raise e
   end
 end

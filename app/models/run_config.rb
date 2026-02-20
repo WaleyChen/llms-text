@@ -37,6 +37,15 @@ class RunConfig < ApplicationRecord
     broadcast_run_config_update
   end
 
+  def fail_all_runs(error_message)
+    ActiveRecord::Base.transaction do
+      runs.each do |run|
+        run.update!(status: Run::STATUS_FAILED, error: error_message, finished_at: Time.current)
+      end
+      fail
+    end
+  end
+
   def append_debug_logs(lines)
     return if lines.blank?
 

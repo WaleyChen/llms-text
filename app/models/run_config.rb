@@ -40,7 +40,8 @@ class RunConfig < ApplicationRecord
   def fail_all_runs(error_message)
     ActiveRecord::Base.transaction do
       runs.each do |run|
-        run.update!(status: Run::STATUS_FAILED, error: error_message, finished_at: Time.current)
+        run.update!(status: Run::STATUS_FAILED, finished_at: Time.current)
+        run.append_debug_logs("RunConfig#fail_all_runs: #{error_message}")
       end
       fail
     end

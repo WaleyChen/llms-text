@@ -8,7 +8,8 @@ module LlmsTxt
     DEFAULT_MAX_DEPTH = 3
     CONCURRENCY = 4
 
-    AUTH_STATUSES = [401, 403].freeze
+    # Statuses that we don't treat as crawl failure (auth-blocked, not found, or gone)
+    ACCEPTABLE_FAILURE_STATUSES = [401, 403, 404, 410].freeze
     CRAWL_CACHE_EXPIRY = 1.day
 
     def initialize(base_url, max_pages:, max_depth:, run_config:)
@@ -40,7 +41,7 @@ module LlmsTxt
       elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
       debug_lines << "Crawl Latency: #{elapsed.round(2)} seconds"
 
-      # Fail if any pages returned errors except when all failed pages are authentication errors
+      # Fail if any pages returned errors except when all failed pages are acceptable (auth or 404)
       error = if @failed_pages.present? && !all_auth_errors?
         "Crawl failed: some pages returned errors: failed_pages: (#{JSON.pretty_generate(@failed_pages)})"
       end
@@ -65,7 +66,7 @@ module LlmsTxt
 
     def all_auth_errors?
       @failed_pages.all? do |fp|
-        AUTH_STATUSES.include?(fp[:status]) || fp[:error].to_s.match?(/auth|unauthorized|forbidden/i)
+        ACCEPTABLE_FAILURE_STATUSES.include?(fp[:status]) || fp[:error].to_s.match?(/auth|unauthorized|forbidden/i)
       end
     end
 

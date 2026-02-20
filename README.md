@@ -3,6 +3,7 @@
 A web app that crawls a website and generates an [llms.txt](https://llmstxt.org/) file -- a structured markdown file that helps LLMs understand and navigate site content.
 
 **Live App:** https://llmstxt.dev/
+**Architecture** https://link.excalidraw.com/readonly/GG79HoLOVxv4sSt79atc
 
 ## How It Works
 

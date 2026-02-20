@@ -8,7 +8,7 @@ module LlmsTxt
     DEFAULT_MAX_DEPTH = 3
     CONCURRENCY = 4
 
-    # Statuses that we don't treat as crawl failure (auth-blocked, not found, or gone)
+    # Statuses that we don't treat as crawl failure (auth-blocked, forbidden, not found, or gone)
     ACCEPTABLE_FAILURE_STATUSES = [401, 403, 404, 410].freeze
     CRAWL_CACHE_EXPIRY = 1.day
 

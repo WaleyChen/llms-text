@@ -8,6 +8,18 @@ A web app that crawls a website and generates an [llms.txt](https://llmstxt.org/
 
 <img width="797" height="387" alt="Screenshot 2026-02-19 at 7 40 55 PM" src="https://github.com/user-attachments/assets/7436fd72-af62-4583-adfe-23cdae080d52" />
 
+## How to Use
+
+1. **Enter a URL** — Paste any website URL (e.g. `tryprofound.com` or `https://example.com`).
+2. **Configure options** (optional):
+   - **Max Pages**: Limit how many pages to crawl (default: 20)
+   - **Max Depth**: How many link levels deep to follow (default: 3)
+   - **Model**: Choose LLM for grouping/enrichment, or "None" for path-based grouping
+3. **Click "Generate"** — The app will crawl the site and generate the llms.txt file.
+4. **View results** — Once complete, click "View" to see the generated llms.txt file.
+
+**Note:** Crawling and generation happen in the background. You'll see live status updates (pending → crawling → generating → completed) as the job progresses.
+
 ## How It Works
 
 1. **URL Validation** — The submitted URL is validated (format, DNS resolution, SSRF protection) and checked for reachability via Faraday with redirect following.

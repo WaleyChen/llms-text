@@ -41,8 +41,8 @@ module LlmsTxt
       debug_lines << "Crawl Latency: #{elapsed.round(2)} seconds"
 
       # Fail if any pages returned errors except when all failed pages are authentication errors
-      error = if @pages.empty? && @failed_pages.present? && !all_auth_errors?
-        "Crawl failed: all pages returned errors."
+      error = if @failed_pages.present? && !all_auth_errors?
+        "Crawl failed: some pages returned errors."
       end
 
       result = {pages: @pages, failed_pages: @failed_pages, error: error, debug_lines: debug_lines.join("\n")}

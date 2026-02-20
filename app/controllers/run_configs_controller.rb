@@ -26,7 +26,7 @@ class RunConfigsController < ApplicationController
     
     # Handle/Validate/Normalize attributes
     attrs = run_config_params.to_h
-    url, error = validate_url(attrs[:url])
+    url, error = validate_url(attrs[:url]) # Validate the URL
     if error
       return render_error(error)
     end

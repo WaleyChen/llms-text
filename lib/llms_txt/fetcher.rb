@@ -78,11 +78,11 @@ module LlmsTxt
         body = response.body.to_s
 
         # If JS-rendered, refetch with headless browser for full content
-        if response.success? && html_response?(response) && javascript_rendered?(body)
-          puts "JavaScript-rendered page detected for #{url}, fetching with headless browser"
-          ferrum_body = fetch_with_ferrum(url)
-          body = ferrum_body if ferrum_body.present?
-        end
+        # if response.success? && html_response?(response) && javascript_rendered?(body)
+        #   puts "JavaScript-rendered page detected for #{url}, fetching with headless browser"
+        #   ferrum_body = fetch_with_ferrum(url)
+        #   body = ferrum_body if ferrum_body.present?
+        # end
 
         if response.success?
           Rails.cache.write(cache_key, body, expires_in: CACHE_EXPIRY)

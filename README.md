@@ -48,12 +48,12 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-## Deployment
+## Deployment (Review)
 1. Finish Setup instructions.
 2. Sign up for Heroku: https://signup.heroku.com/
 3. Create a Heroku app: https://devcenter.heroku.com/articles/getting-started-with-rails8#create-a-heroku-app
 4. Setup LLM API keys: https://devcenter.heroku.com/articles/config-vars#using-the-heroku-dashboard
-5. Provision a Database: https://devcenter.heroku.com/articles/getting-started-with-rails8#provision-a-database
+5. Provision the database with the command: `bin/rails db:prepare`
 6. Deploy the App to Heroku: https://devcenter.heroku.com/articles/getting-started-with-rails8#deploy-the-app-to-heroku
 7. Migrate the Database: https://devcenter.heroku.com/articles/getting-started-with-rails8#migrate-the-database
 8. Scale and Access the Application: https://devcenter.heroku.com/articles/getting-started-with-rails8#scale-and-access-the-application

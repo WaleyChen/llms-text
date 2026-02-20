@@ -4,6 +4,8 @@ A web app that crawls a website and generates an [llms.txt](https://llmstxt.org/
 
 **Live App:** https://llmstxt.dev/
 
+<img width="797" height="387" alt="Screenshot 2026-02-19 at 7 40 55 PM" src="https://github.com/user-attachments/assets/7436fd72-af62-4583-adfe-23cdae080d52" />
+
 ## How It Works
 
 1. **URL Validation** — The submitted URL is validated (format, DNS resolution, SSRF protection) and checked for reachability via Faraday with redirect following.
